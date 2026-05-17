@@ -4,7 +4,55 @@ Plain-English guide to what `baseline.sh` does to your machine. Walk through eac
 
 This document complements `README.md` (the one-glance feature table). Read this when you want to actually understand what's running on your box.
 
+## At a glance
+
+If you only have 60 seconds, here's what changes about your box after `baseline.sh` finishes.
+
+**Login surface**
+
+- SSH: root login off, passwords off, key-only auth, brute-force protection via [fail2ban](#818--fail2ban-brute-force-protection)
+- New non-root user with sudo, [requires a password you set during the run](#318--sudo-user) — so a leaked SSH key alone can't escalate
+- [Password aging](#1418--password-policy-logindefs) (90-day expiry) and complexity rules via PAM
+
+**Network**
+
+- [UFW firewall](#718--firewall-ufw): only TCP 22 / 80 / 443 reachable; everything else dropped
+- [Kernel network stack](#918--kernel-hardening-sysctl) hardened against SYN floods, source spoofing, ICMP redirects
+- [Rare protocols (DCCP/SCTP/RDS/TIPC) and USB/firewire storage drivers blacklisted](#1618--disable-unused-kernel-modules--restrict-compilers)
+
+**Monitoring & forensics**
+
+- [Cockpit + Netdata](#1118--monitoring-cockpit--netdata) installed, reachable only via SSH tunnel — never exposed publicly
+- [auditd](#1218--intrusion-detection-rkhunter--auditd--aide) logs identity changes, SSH config edits, audit tampering, login records, time changes, module loads
+- [AIDE](#1218--intrusion-detection-rkhunter--auditd--aide) maintains a filesystem-integrity baseline so you can detect drift
+- [rkhunter](#1218--intrusion-detection-rkhunter--auditd--aide) scans for known rootkit signatures
+- [debsums](#1518--debian-goodies--pam-strength) daily-cron verifies package files match their manifests
+- [Lynis](#1818--security-audit-lynis) audits the whole box and gives you a 0–100 score
+
+**Defense in depth**
+
+- [AppArmor](#1018--apparmor) profiles in enforce mode (mandatory access control)
+- [Compilers (gcc/g++/cc/as) locked to root](#1618--disable-unused-kernel-modules--restrict-compilers) — blocks the build-local-exploit step of most privesc chains
+- [Automatic security updates](#218--automatic-security-updates) via `unattended-upgrades`
+
+**Day-to-day usage**
+
+- Log in: `ssh <user>@<server-ip>` with your key, then `sudo` with the password you set
+- Read logs: `journalctl -f`, `sudo ausearch -k identity`, `sudo fail2ban-client status sshd`
+- Web UIs (Cockpit, Netdata): via SSH tunnel (commands in [section 11](#1118--monitoring-cockpit--netdata))
+- Re-run anytime — the script is idempotent and preserves your customizations
+
+**Not appropriate for**
+
+- Desktops or laptops — [see why](#a-note-on-running-this-on-a-desktop-not-a-server)
+- Anything pre-Debian 13
+- A box without an SSH public key in `/root/.ssh/authorized_keys` before you start (the script refuses to run)
+
 ## Contents
+
+**Overview**
+
+- [At a glance](#at-a-glance)
 
 **Setup**
 
@@ -585,6 +633,10 @@ Running it unmodified on a desktop is a bad time. If you want a desktop-flavored
 ---
 
 ## Contents (again, for the long scrollers)
+
+**Overview**
+
+- [At a glance](#at-a-glance)
 
 **Setup**
 
