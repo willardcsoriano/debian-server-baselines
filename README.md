@@ -30,7 +30,8 @@ Most hardening scripts lock your server and disappear. This one installs the too
 | Cockpit | Browser-based server management (SSH tunnel access) |
 | Netdata | Real-time CPU, RAM, disk, network, Docker monitoring |
 | rkhunter | Rootkit detection, baseline saved |
-| auditd | Kernel-level audit logging |
+| auditd | Kernel-level audit logging with a baseline ruleset (identity, SSH, time, module loading) |
+| AIDE | File integrity monitoring — database initialized on first run |
 | Legal banners | `/etc/issue` + `/etc/issue.net` warning text |
 | Password policy | Aging, umask 027, SHA512 hash rounds via `/etc/login.defs` |
 | Debian goodies | `libpam-tmpdir`, `libpam-passwdqc`, `apt-listbugs/changes`, `needrestart`, `debsums`, `apt-show-versions` |

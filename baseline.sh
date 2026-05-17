@@ -267,8 +267,8 @@ note "Access: ssh -N -L 19999:localhost:19999 $NEW_USER@$SERVER_IP → http://lo
 
 # ─── 12. rkhunter + auditd ───────────────────────────────────────────────────
 
-section "12/18 Intrusion detection (rkhunter + auditd)"
-DEBIAN_FRONTEND=noninteractive apt-get install -y -qq rkhunter auditd
+section "12/18 Intrusion detection (rkhunter + auditd + AIDE)"
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq rkhunter auditd aide
 rkhunter --update --quiet 2>/dev/null || true
 if [[ ! -f /var/lib/rkhunter/db/rkhunter.dat ]]; then
   rkhunter --propupd --quiet 2>/dev/null || true
@@ -276,6 +276,20 @@ if [[ ! -f /var/lib/rkhunter/db/rkhunter.dat ]]; then
 else
   pass "rkhunter database present (baseline preserved)"
 fi
+
+# FINT-4350: AIDE for file integrity monitoring. The first init scans the
+# entire filesystem and takes ~30–60s on a clean Debian install. Skip if
+# a database already exists so re-runs don't rebuild from scratch.
+if [[ -f /var/lib/aide/aide.db ]] || [[ -f /var/lib/aide/aide.db.gz ]]; then
+  pass "AIDE database present (baseline preserved)"
+else
+  note "Initializing AIDE database — this takes ~30–60s on a fresh install..."
+  aideinit --yes --force >/dev/null 2>&1 || aide --init >/dev/null 2>&1 || true
+  [[ -f /var/lib/aide/aide.db.new.gz ]] && mv -f /var/lib/aide/aide.db.new.gz /var/lib/aide/aide.db.gz
+  [[ -f /var/lib/aide/aide.db.new ]]    && mv -f /var/lib/aide/aide.db.new /var/lib/aide/aide.db
+  pass "AIDE database initialized"
+fi
+
 systemctl enable --now auditd -q
 
 # ACCT-9630: auditd starts with an empty ruleset by default — drop a baseline
@@ -460,7 +474,7 @@ else
   echo -e "  ${GREEN}✓${NC} Cockpit: installed, tunnel-only access"
   echo -e "  ${YELLOW}⚠${NC} Netdata: install failed — install manually"
 fi
-echo -e "  ${GREEN}✓${NC} rkhunter + auditd: intrusion detection active"
+echo -e "  ${GREEN}✓${NC} rkhunter + auditd + AIDE: intrusion detection active"
 echo -e "  ${GREEN}✓${NC} Legal banners + password policy enforced"
 echo -e "  ${GREEN}✓${NC} Debian-goodies + PAM strength installed"
 echo -e "  ${GREEN}✓${NC} Unused kernel modules blacklisted"
