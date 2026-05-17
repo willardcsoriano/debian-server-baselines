@@ -167,9 +167,16 @@ set_sshd ClientAliveCountMax    2
 set_sshd LogLevel               VERBOSE
 set_sshd TCPKeepAlive           no
 
+# AllowUsers: explicit allowlist of every sudo group member (minus root). This
+# closes the case where a local account exists without a password but with a
+# usable shell — PermitRootLogin=no blocks root, this blocks everyone else by
+# default. On re-run we re-derive the list so newly-added sudoers are included.
+SUDO_USERS=$(getent group sudo | cut -d: -f4 | tr ',' ' ' | sed 's/\broot\b//g' | xargs)
+[[ -n "$SUDO_USERS" ]] && set_sshd AllowUsers "$SUDO_USERS"
+
 sshd -t || fail "sshd_config invalid — original backed up to $SSHD_CONFIG.bak.*"
 systemctl reload sshd
-pass "SSH hardened (root off, key-only, restricted forwarding/sessions)"
+pass "SSH hardened (root off, key-only, restricted forwarding/sessions, AllowUsers=$SUDO_USERS)"
 
 # ─── 7. Firewall ──────────────────────────────────────────────────────────────
 

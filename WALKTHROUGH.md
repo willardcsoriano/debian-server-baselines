@@ -216,6 +216,7 @@ ssh-keygen -l -f /home/<user>/.ssh/authorized_keys   # show key fingerprint
 | `ClientAliveCountMax` | `2` | Idle connections get pruned. |
 | `LogLevel` | `VERBOSE` | More detail in `/var/log/auth.log` for forensics. |
 | `TCPKeepAlive` | `no` | Use SSH's own keepalive (more honest about idle state). |
+| `AllowUsers` | _sudo group_ | Explicit allowlist of every sudo group member (minus root). Closes the door on any local account that isn't explicitly a sudoer — `PermitRootLogin=no` blocks root, this blocks the rest by default. Re-derived on every re-run so new sudoers are picked up. |
 
 **Verify after:**
 ```bash
