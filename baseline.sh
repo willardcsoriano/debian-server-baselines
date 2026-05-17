@@ -203,6 +203,16 @@ port    = 22"
     note "Migrated jail.local → jail.d/00-baseline.conf (user override slot freed)"
   fi
 fi
+# DEB-0880: ensure /etc/fail2ban/jail.local exists so package updates can't
+# silently replace jail.conf-derived config. We leave the file empty for the
+# operator to use as their override slot — our policy lives in jail.d/.
+if [[ ! -f /etc/fail2ban/jail.local ]]; then
+  cat > /etc/fail2ban/jail.local <<'EOF'
+# fail2ban user override file. Loaded after jail.conf and jail.d/*.conf.
+# Add custom overrides here — debian-baseline will not touch this file
+# unless its content exactly matches a legacy baseline write.
+EOF
+fi
 systemctl enable --now fail2ban -q
 systemctl reload fail2ban 2>/dev/null || systemctl restart fail2ban -q 2>/dev/null || true
 pass "fail2ban active — 5 failed attempts → 1h ban"
