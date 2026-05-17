@@ -224,7 +224,7 @@ kernel.randomize_va_space = 2
 kernel.dmesg_restrict = 1
 kernel.kptr_restrict = 2
 EOF
-sysctl --system -q
+sysctl --system >/dev/null
 pass "Kernel parameters applied"
 
 # ─── 10. AppArmor ────────────────────────────────────────────────────────────
