@@ -1,50 +1,43 @@
 # debian-baseline — walkthrough
 
-Plain-English guide to what `baseline.sh` does to your machine. Walk through each of the 18 sections, see exactly which files get created/modified, which services start, what attacks each step blocks, and how to verify it's working after the fact.
+## Overview
 
-This document complements `README.md` (the one-glance feature table). Read this when you want to actually understand what's running on your box.
+This is the section-by-section explainer for `baseline.sh` — what each of the 18 numbered sections actually does to a Debian 13 box, which files it writes, which services it starts, the attack it's defending against, and the command you can run afterward to verify it took effect. It complements `README.md` (the one-glance feature table) and is the right place to look when something on your hardened server surprises you or when you want to understand a step before re-running. Sections are linear (1 → 18), preceded by a pre-flight check description, and followed by reference material: a paths cheatsheet, day-to-day usage commands, the re-run preservation contract, deliberate gaps the script does not try to close, troubleshooting, and a note on why this script is server-flavored and would hurt a desktop. Skim the "At a glance" block below if 60 seconds is all you have.
 
-## Contents
+## Table of Contents
 
-**Overview**
-
+- [Overview](#overview)
 - [At a glance](#at-a-glance)
-
-**Setup**
-
-- [Pre-flight checks](#pre-flight-before-any-section-runs)
-
-**The 18 sections**
-
-- [1/18 — System updates](#118--system-updates)
-- [2/18 — Automatic security updates](#218--automatic-security-updates)
-- [3/18 — Sudo user](#318--sudo-user)
-- [4/18 — SSH key copy](#418--ssh-key-copy)
-- [5/18 — SSH safety check](#518--ssh-safety-check-first-run-only)
-- [6/18 — SSH hardening](#618--ssh-hardening)
-- [7/18 — Firewall (UFW)](#718--firewall-ufw)
-- [8/18 — fail2ban (brute-force protection)](#818--fail2ban-brute-force-protection)
-- [9/18 — Kernel hardening (sysctl)](#918--kernel-hardening-sysctl)
-- [10/18 — AppArmor](#1018--apparmor)
-- [11/18 — Monitoring (Cockpit + Netdata)](#1118--monitoring-cockpit--netdata)
-- [12/18 — Intrusion detection (rkhunter + auditd + AIDE)](#1218--intrusion-detection-rkhunter--auditd--aide)
-- [13/18 — Legal banners](#1318--legal-banners)
-- [14/18 — Password policy (login.defs)](#1418--password-policy-logindefs)
-- [15/18 — Debian goodies + PAM strength](#1518--debian-goodies--pam-strength)
-- [16/18 — Disable unused kernel modules + restrict compilers](#1618--disable-unused-kernel-modules--restrict-compilers)
-- [17/18 — Process accounting (acct + sysstat)](#1718--process-accounting-acct--sysstat)
-- [18/18 — Security audit (Lynis)](#1818--security-audit-lynis)
-
-**Reference**
-
+- [Pre-flight (before any section runs)](#pre-flight-before-any-section-runs)
+- [1/18 — System updates](#118-system-updates)
+- [2/18 — Automatic security updates](#218-automatic-security-updates)
+- [3/18 — Sudo user](#318-sudo-user)
+- [4/18 — SSH key copy](#418-ssh-key-copy)
+- [5/18 — SSH safety check (first run only)](#518-ssh-safety-check-first-run-only)
+- [6/18 — SSH hardening](#618-ssh-hardening)
+- [7/18 — Firewall (UFW)](#718-firewall-ufw)
+- [8/18 — fail2ban (brute-force protection)](#818-fail2ban-brute-force-protection)
+- [9/18 — Kernel hardening (sysctl)](#918-kernel-hardening-sysctl)
+- [10/18 — AppArmor](#1018-apparmor)
+- [11/18 — Monitoring (Cockpit + Netdata)](#1118-monitoring-cockpit-netdata)
+- [12/18 — Intrusion detection (rkhunter + auditd + AIDE)](#1218-intrusion-detection-rkhunter-auditd-aide)
+  - [rkhunter](#rkhunter)
+  - [AIDE (Advanced Intrusion Detection Environment)](#aide-advanced-intrusion-detection-environment)
+  - [auditd](#auditd)
+- [13/18 — Legal banners](#1318-legal-banners)
+- [14/18 — Password policy (login.defs)](#1418-password-policy-logindefs)
+- [15/18 — Debian goodies + PAM strength](#1518-debian-goodies-pam-strength)
+- [16/18 — Disable unused kernel modules + restrict compilers](#1618-disable-unused-kernel-modules-restrict-compilers)
+  - [Kernel module blacklist](#kernel-module-blacklist)
+  - [Compiler restriction](#compiler-restriction)
+- [17/18 — Process accounting (acct + sysstat)](#1718-process-accounting-acct-sysstat)
+- [18/18 — Security audit (Lynis)](#1818-security-audit-lynis)
 - [Where things live (paths cheatsheet)](#where-things-live-paths-cheatsheet)
 - [How to use the box after the script runs](#how-to-use-the-box-after-the-script-runs)
 - [What re-running the script does (and doesn't)](#what-re-running-the-script-does-and-doesnt)
 - [Deliberate gaps (what this script does NOT do)](#deliberate-gaps-what-this-script-does-not-do)
 - [Troubleshooting](#troubleshooting)
 - [A note on running this on a desktop (not a server)](#a-note-on-running-this-on-a-desktop-not-a-server)
-
----
 
 ## At a glance
 
@@ -631,47 +624,3 @@ This script is written for *servers* — headless, single-purpose, network-expos
 - **Section 14 password aging** — your password expires every 90 days.
 
 Running it unmodified on a desktop is a bad time. If you want a desktop-flavored hardening pass, you'd want to (at minimum) skip sections 7, 16's USB blacklist, 16's compiler restriction, and possibly relax section 14.
-
----
-
-## Contents (again, for the long scrollers)
-
-**Overview**
-
-- [At a glance](#at-a-glance)
-
-**Setup**
-
-- [Pre-flight checks](#pre-flight-before-any-section-runs)
-
-**The 18 sections**
-
-- [1/18 — System updates](#118--system-updates)
-- [2/18 — Automatic security updates](#218--automatic-security-updates)
-- [3/18 — Sudo user](#318--sudo-user)
-- [4/18 — SSH key copy](#418--ssh-key-copy)
-- [5/18 — SSH safety check](#518--ssh-safety-check-first-run-only)
-- [6/18 — SSH hardening](#618--ssh-hardening)
-- [7/18 — Firewall (UFW)](#718--firewall-ufw)
-- [8/18 — fail2ban (brute-force protection)](#818--fail2ban-brute-force-protection)
-- [9/18 — Kernel hardening (sysctl)](#918--kernel-hardening-sysctl)
-- [10/18 — AppArmor](#1018--apparmor)
-- [11/18 — Monitoring (Cockpit + Netdata)](#1118--monitoring-cockpit--netdata)
-- [12/18 — Intrusion detection (rkhunter + auditd + AIDE)](#1218--intrusion-detection-rkhunter--auditd--aide)
-- [13/18 — Legal banners](#1318--legal-banners)
-- [14/18 — Password policy (login.defs)](#1418--password-policy-logindefs)
-- [15/18 — Debian goodies + PAM strength](#1518--debian-goodies--pam-strength)
-- [16/18 — Disable unused kernel modules + restrict compilers](#1618--disable-unused-kernel-modules--restrict-compilers)
-- [17/18 — Process accounting (acct + sysstat)](#1718--process-accounting-acct--sysstat)
-- [18/18 — Security audit (Lynis)](#1818--security-audit-lynis)
-
-**Reference**
-
-- [Where things live (paths cheatsheet)](#where-things-live-paths-cheatsheet)
-- [How to use the box after the script runs](#how-to-use-the-box-after-the-script-runs)
-- [What re-running the script does (and doesn't)](#what-re-running-the-script-does-and-doesnt)
-- [Deliberate gaps (what this script does NOT do)](#deliberate-gaps-what-this-script-does-not-do)
-- [Troubleshooting](#troubleshooting)
-- [A note on running this on a desktop (not a server)](#a-note-on-running-this-on-a-desktop-not-a-server)
-
-[↑ Back to top](#debian-baseline--walkthrough)
