@@ -380,6 +380,16 @@ pass "Password aging + umask 027 + SHA512 rounds configured"
 # ─── 15. Debian goodies + PAM strength ───────────────────────────────────────
 
 section "15/18 Debian goodies + PAM strength"
+# Pre-seed needrestart's config so its first invocation (during its own
+# install, and apt installs in sections 17/18) auto-restarts deferred
+# services and stops printing the "Services to be restarted" list.
+# Creating the dir before needrestart owns it is fine — root:root, 0755
+# is what the package would set anyway.
+mkdir -p /etc/needrestart/conf.d
+cat > /etc/needrestart/conf.d/50-autorestart.conf <<'EOF'
+# Managed by debian-baseline. 'a' = auto-restart, no prompts, no list.
+$nrconf{restart} = 'a';
+EOF
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
   libpam-tmpdir libpam-passwdqc apt-listbugs apt-listchanges \
   needrestart debsums apt-show-versions
