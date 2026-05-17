@@ -572,7 +572,10 @@ if [[ $INSTALL_DOCKER -eq 1 ]]; then
     echo ""
     echo -e "  Open a new terminal and run:"
     echo -e "  ${BOLD}    ssh $NEW_USER@$SERVER_IP${NC}"
-    echo -e "  ${DIM}  (if you use an SSH alias or -i flag, use that instead of the raw IP)${NC}"
+    echo ""
+    echo -e "  ${DIM}  If that fails with 'Permission denied (publickey)', your SSH client may${NC}"
+    echo -e "  ${DIM}  not be loading the right key. Try your SSH alias for this host instead,${NC}"
+    echo -e "  ${DIM}  or add -i /path/to/your/private/key to the command above.${NC}"
     echo ""
     echo -e "  Keep that session open, then press ${BOLD}Enter${NC} here to continue..."
     read -r </dev/tty
