@@ -243,6 +243,7 @@ systemctl enable --now cockpit.socket -q
 pass "Cockpit installed"
 note "Access: ssh -N -L 9090:localhost:9090 $NEW_USER@$SERVER_IP → https://localhost:9090"
 
+NETDATA_OK=1
 if [[ -x /opt/netdata/bin/netdata ]] || systemctl list-unit-files 2>/dev/null | grep -q '^netdata\.service'; then
   pass "Netdata already installed (preserved)"
 elif bash <(curl -Ss https://my-netdata.io/kickstart.sh) \
@@ -250,6 +251,7 @@ elif bash <(curl -Ss https://my-netdata.io/kickstart.sh) \
   pass "Netdata installed"
 else
   warn "Netdata install failed — install manually"
+  NETDATA_OK=0
 fi
 note "Access: ssh -N -L 19999:localhost:19999 $NEW_USER@$SERVER_IP → http://localhost:19999"
 
@@ -371,7 +373,12 @@ echo -e "  ${GREEN}✓${NC} Firewall: 22, 80, 443 open — all else denied"
 echo -e "  ${GREEN}✓${NC} fail2ban: brute-force protection active"
 echo -e "  ${GREEN}✓${NC} Kernel: network attack surface reduced"
 echo -e "  ${GREEN}✓${NC} AppArmor: mandatory access control active"
-echo -e "  ${GREEN}✓${NC} Cockpit + Netdata: installed, tunnel-only access"
+if [[ ${NETDATA_OK:-1} -eq 1 ]]; then
+  echo -e "  ${GREEN}✓${NC} Cockpit + Netdata: installed, tunnel-only access"
+else
+  echo -e "  ${GREEN}✓${NC} Cockpit: installed, tunnel-only access"
+  echo -e "  ${YELLOW}⚠${NC} Netdata: install failed — install manually"
+fi
 echo -e "  ${GREEN}✓${NC} rkhunter + auditd: intrusion detection active"
 echo -e "  ${GREEN}✓${NC} Legal banners + password policy enforced"
 echo -e "  ${GREEN}✓${NC} Debian-goodies + PAM strength installed"
