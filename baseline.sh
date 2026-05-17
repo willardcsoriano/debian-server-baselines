@@ -375,7 +375,15 @@ set_login_def UMASK                 027
 set_login_def SHA_CRYPT_MIN_ROUNDS  5000
 set_login_def SHA_CRYPT_MAX_ROUNDS  100000
 set_login_def ENCRYPT_METHOD        SHA512
-pass "Password aging + umask 027 + SHA512 rounds configured"
+
+# login.defs only binds at user-creation time, so accounts created before
+# this step (most importantly the sudo user from section 3) keep Debian's
+# defaults. Apply the same aging policy to every existing sudo group member
+# via chage so the policy actually takes effect on the box.
+for sudo_user in $(getent group sudo | cut -d: -f4 | tr ',' '\n' | grep -v '^$' | grep -v '^root$'); do
+  chage -M 90 -m 1 -W 7 "$sudo_user" 2>/dev/null || true
+done
+pass "Password aging + umask 027 + SHA512 rounds configured (applied to existing sudo users)"
 
 # ─── 15. Debian goodies + PAM strength ───────────────────────────────────────
 
