@@ -326,7 +326,16 @@ section "15/18 Debian goodies + PAM strength"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
   libpam-tmpdir libpam-passwdqc apt-listbugs apt-listchanges \
   needrestart debsums apt-show-versions
-pass "libpam-tmpdir, libpam-passwdqc, apt safety nets installed"
+# PKGS-7370: enable debsums daily cron so package integrity is verified
+# on a schedule, not just on demand.
+if [[ -f /etc/default/debsums ]]; then
+  if grep -qE '^#?\s*CRON_CHECK=' /etc/default/debsums; then
+    sed -i -E 's|^#?\s*CRON_CHECK=.*|CRON_CHECK="daily"|' /etc/default/debsums
+  else
+    echo 'CRON_CHECK="daily"' >> /etc/default/debsums
+  fi
+fi
+pass "libpam-tmpdir, libpam-passwdqc, apt safety nets installed (debsums cron: daily)"
 
 # ─── 16. Disable unused kernel modules ───────────────────────────────────────
 
