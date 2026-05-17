@@ -45,8 +45,8 @@ If you only have 60 seconds, here's what changes about your box after `baseline.
 
 **Login surface**
 
-- SSH: root login off, passwords off, key-only auth, brute-force protection via [fail2ban](#818--fail2ban-brute-force-protection)
-- New non-root user with sudo, [requires a password you set during the run](#318--sudo-user) — so a leaked SSH key alone can't escalate
+- SSH: root login off, password-based SSH off (key-only auth), brute-force protection via [fail2ban](#818--fail2ban-brute-force-protection)
+- New non-root user with sudo — [requires a password you set during the run](#318--sudo-user) (so a leaked SSH key alone can't escalate to root)
 - [Password aging](#1418--password-policy-logindefs) (90-day expiry) and complexity rules via PAM
 
 **Network**
