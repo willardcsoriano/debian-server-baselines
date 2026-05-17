@@ -354,6 +354,25 @@ blacklist firewire-sbp2
 EOF
 pass "Rare network protocols + USB/Firewire storage blacklisted"
 
+# HRDN-7222: restrict compilers to root only. Lynis flags world-executable
+# compilers because they let an attacker with a shell build local exploits.
+# We touch the unversioned names and the versioned ones the apt toolchain
+# installs (gcc-13, g++-13, etc.).
+COMPILERS_RESTRICTED=0
+for compiler in /usr/bin/gcc /usr/bin/g++ /usr/bin/cc /usr/bin/c++ \
+                /usr/bin/cpp /usr/bin/as /usr/bin/gcc-* /usr/bin/g++-*; do
+  if [[ -e $compiler ]]; then
+    chown root:root "$compiler" 2>/dev/null || true
+    chmod 750 "$compiler"
+    COMPILERS_RESTRICTED=1
+  fi
+done
+if [[ $COMPILERS_RESTRICTED -eq 1 ]]; then
+  pass "Compilers (gcc/g++/cc/c++/cpp/as) restricted to root (mode 750)"
+else
+  note "No compilers found on \$PATH — nothing to restrict"
+fi
+
 # ─── 17. Process accounting ──────────────────────────────────────────────────
 
 section "17/18 Process accounting (acct + sysstat)"
