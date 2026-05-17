@@ -1,5 +1,15 @@
 # debian-baseline
 
+## Table of Contents
+
+- [What it does](#what-it-does)
+- [Requirements](#requirements)
+- [What happens](#what-happens)
+- [Idempotent — safe to re-run](#idempotent-safe-to-re-run)
+- [After it runs](#after-it-runs)
+- [Compatibility](#compatibility)
+  - [VS Code Remote-SSH (and other `-L` / `-D` tunneling tools)](#vs-code-remote-ssh-and-other--l--d-tunneling-tools)
+
 One command to harden a fresh Debian 13 server.
 
 ```bash
@@ -86,3 +96,25 @@ ssh -N -L 19999:localhost:19999 youruser@your-server-ip
 ```
 
 Lynis report: `/var/log/lynis.log`
+
+## Compatibility
+
+### VS Code Remote-SSH (and other `-L` / `-D` tunneling tools)
+
+The script sets `AllowTcpForwarding no` so a leaked SSH key can't be used as a generic tunnel. That also blocks the dynamic SOCKS forward Remote-SSH opens to reach `vscode-server` on the remote loopback, so connections fail with:
+
+```
+channel N: open failed: administratively prohibited: open failed
+ERROR: TCP port forwarding appears to be disabled on the remote host.
+```
+
+To re-enable the lower-risk directions (`-L` local, `-D` dynamic) while keeping reverse forwards (`-R`) blocked, drop in an override after running this script:
+
+```bash
+sudo tee /etc/ssh/sshd_config.d/10-remote-dev.conf > /dev/null <<EOF
+AllowTcpForwarding local
+EOF
+sudo sshd -t && sudo systemctl reload ssh
+```
+
+The drop-in survives re-runs because the script edits `/etc/ssh/sshd_config` directly, not the `.d/` directory. OpenSSH evaluates the first matching directive, so `local` from the drop-in wins over `no` in the main file.
