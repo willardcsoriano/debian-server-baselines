@@ -39,7 +39,7 @@ fi
 
 echo ""
 [[ -t 0 || -r /dev/tty ]] || fail "No tty available — this script requires interactive input. Use 'curl ... | sudo bash' from a terminal, not from a non-interactive context."
-EXISTING_SUDO=$(getent group sudo | cut -d: -f4 | tr ',' '\n' | grep -v '^$' | grep -v '^root$' | head -1)
+EXISTING_SUDO=$(getent group sudo | cut -d: -f4 | tr ',' '\n' | grep -v '^$' | grep -v '^root$' | head -1 || true)
 if [[ -n "$EXISTING_SUDO" ]]; then
   read -rp "  Sudo username [$EXISTING_SUDO]: " NEW_USER </dev/tty
   NEW_USER="${NEW_USER:-$EXISTING_SUDO}"
