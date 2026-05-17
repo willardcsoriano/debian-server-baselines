@@ -20,7 +20,7 @@ Most hardening scripts lock your server and disappear. This one installs the too
 |---|---|
 | System updates | Upgrades all installed packages to current versions |
 | Automatic security updates | Installs `unattended-upgrades` so security patches apply on their own |
-| Sudo user | Creates a non-root account with passwordless sudo |
+| Sudo user | Creates a non-root account and prompts for a sudo password (defense in depth — leaked SSH key alone can't escalate) |
 | SSH key | Copies `/root/.ssh/authorized_keys` to the new user |
 | SSH hardening | Disables root login and password auth, key-only, restricts forwarding/sessions |
 | Firewall | UFW — ports 22, 80, 443 open; everything else denied |
@@ -47,7 +47,7 @@ Most hardening scripts lock your server and disappear. This one installs the too
 
 ## What happens
 
-The script asks for one thing: your sudo username (pre-filled on re-runs). Everything else is automatic.
+The script asks for two things on first run: your sudo username (pre-filled on re-runs) and a sudo password for that user. Everything else is automatic.
 
 One pause on first run: before locking down SSH, it asks you to verify your new account works in a second terminal. This prevents lockouts. Re-runs skip this pause automatically.
 

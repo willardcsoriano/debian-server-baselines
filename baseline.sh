@@ -100,9 +100,22 @@ else
   pass "User $NEW_USER created"
 fi
 usermod -aG sudo "$NEW_USER"
-echo "$NEW_USER ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/"$NEW_USER"
+
+# Sudo requires a password — defense in depth so a leaked SSH key alone
+# can't escalate to root. Status "P" means a password is set; anything
+# else (NP, L, or no shadow entry) means we need to prompt for one.
+USER_PWSTATUS=$(passwd -S "$NEW_USER" 2>/dev/null | awk '{print $2}')
+if [[ "$USER_PWSTATUS" != "P" ]]; then
+  echo ""
+  echo -e "  ${YELLOW}Set a sudo password for $NEW_USER:${NC}"
+  echo -e "  ${DIM}(needed because sudo no longer runs without one)${NC}"
+  passwd "$NEW_USER" </dev/tty
+  echo ""
+fi
+
+echo "$NEW_USER ALL=(ALL) ALL" > /etc/sudoers.d/"$NEW_USER"
 chmod 440 /etc/sudoers.d/"$NEW_USER"
-pass "$NEW_USER in sudo group (NOPASSWD)"
+pass "$NEW_USER in sudo group (password required)"
 
 # ─── 4. Copy SSH key ──────────────────────────────────────────────────────────
 
