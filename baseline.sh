@@ -186,8 +186,13 @@ set_sshd TCPKeepAlive           no
 # closes the case where a local account exists without a password but with a
 # usable shell — PermitRootLogin=no blocks root, this blocks everyone else by
 # default. On re-run we re-derive the list so newly-added sudoers are included.
-SUDO_USERS=$(getent group sudo | cut -d: -f4 | tr ',' ' ' | sed 's/\broot\b//g' | xargs)
-[[ -n "$SUDO_USERS" ]] && set_sshd AllowUsers "$SUDO_USERS"
+# $NEW_USER is always included explicitly — group membership caching or timing
+# edge cases on a first run could otherwise leave them out and break SSH.
+SUDO_USERS=$(getent group sudo | cut -d: -f4 | tr ',' ' ' | sed 's/\broot\b//g' | xargs || true)
+if ! echo " $SUDO_USERS " | grep -qw "$NEW_USER"; then
+  SUDO_USERS="${SUDO_USERS:+$SUDO_USERS }$NEW_USER"
+fi
+set_sshd AllowUsers "$SUDO_USERS"
 
 sshd -t || fail "sshd_config invalid — original backed up to $SSHD_CONFIG.bak.*"
 systemctl reload sshd
@@ -558,7 +563,13 @@ if [[ $INSTALL_DOCKER -eq 1 ]]; then
     echo -e "  Keep that session open, then press ${BOLD}Enter${NC} here to continue..."
     read -r </dev/tty
     if [[ ! -S "$_user_bus" ]]; then
-      fail "Still no user session at $_user_bus. Log in as $NEW_USER and re-run the script."
+      echo ""
+      note "SSH diagnostics:"
+      note "  AllowUsers in sshd_config: $(grep -i '^AllowUsers' /etc/ssh/sshd_config || echo '(not set)')"
+      note "  $NEW_USER in sudo group:   $(getent group sudo | grep -ow "$NEW_USER" || echo 'NO')"
+      note "  authorized_keys:           $(ls -la "$USER_HOME/.ssh/authorized_keys" 2>/dev/null || echo 'MISSING')"
+      note "  home dir permissions:      $(stat -c '%A %U:%G' "$USER_HOME" 2>/dev/null)"
+      fail "No user session at $_user_bus. Fix SSH access for $NEW_USER (see diagnostics above), then re-run."
     fi
     pass "User session detected for $NEW_USER"
   fi
