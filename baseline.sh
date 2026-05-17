@@ -617,11 +617,14 @@ EOF
   # Disable the system-mode daemon — rootless replaces it
   systemctl disable --now docker.service docker.socket 2>/dev/null || true
 
-  # Set up rootless daemon as $NEW_USER if not already configured
+  # Set up rootless daemon as $NEW_USER if not already configured.
+  # Check for the systemd user service, not just the binary — the binary
+  # gets created even when setup runs without systemd (missing XDG_RUNTIME_DIR),
+  # so a partial install would otherwise be silently skipped on re-run.
   _user_home=$(getent passwd "$NEW_USER" | cut -d: -f6)
-  _rootless_bin="$_user_home/bin/dockerd-rootless.sh"
-  if [[ ! -f "$_rootless_bin" ]]; then
-    su - "$NEW_USER" -c "dockerd-rootless-setuptool.sh install" || \
+  _docker_svc="$_user_home/.config/systemd/user/docker.service"
+  if [[ ! -f "$_docker_svc" ]]; then
+    su - "$NEW_USER" -c "XDG_RUNTIME_DIR=/run/user/$_user_uid DBUS_SESSION_BUS_ADDRESS=unix:path=$_user_bus dockerd-rootless-setuptool.sh install" || \
       warn "Rootless setup failed — run 'dockerd-rootless-setuptool.sh install' as $NEW_USER manually"
   fi
 
