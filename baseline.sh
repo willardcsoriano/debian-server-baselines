@@ -277,7 +277,50 @@ else
   pass "rkhunter database present (baseline preserved)"
 fi
 systemctl enable --now auditd -q
-pass "auditd active"
+
+# ACCT-9630: auditd starts with an empty ruleset by default — drop a baseline
+# rules file covering identity, SSH, audit config, login records, time, and
+# kernel module loading. augenrules merges rules.d/*.rules into audit.rules
+# and reloads. No -e 2 (immutable) — leaves room for operator-added rules
+# without forcing a reboot to remove them.
+cat > /etc/audit/rules.d/50-baseline.rules <<'EOF'
+## Buffer + failure mode
+-b 8192
+-f 1
+
+## Identity changes
+-w /etc/group       -p wa -k identity
+-w /etc/passwd      -p wa -k identity
+-w /etc/shadow      -p wa -k identity
+-w /etc/gshadow     -p wa -k identity
+-w /etc/sudoers     -p wa -k identity
+-w /etc/sudoers.d/  -p wa -k identity
+
+## SSH config
+-w /etc/ssh/sshd_config    -p wa -k sshd_config
+-w /etc/ssh/sshd_config.d/ -p wa -k sshd_config
+
+## Audit subsystem itself
+-w /etc/audit/        -p wa -k audit_config
+-w /etc/libaudit.conf -p wa -k audit_config
+
+## Login records
+-w /var/log/lastlog    -p wa -k logins
+-w /var/log/btmp       -p wa -k logins
+-w /var/log/wtmp       -p wa -k logins
+-w /var/run/faillock   -p wa -k logins
+
+## System time
+-a always,exit -F arch=b64 -S adjtimex,settimeofday,clock_settime -k time-change
+
+## Kernel module loading
+-w /sbin/insmod    -p x -k modules
+-w /sbin/rmmod     -p x -k modules
+-w /sbin/modprobe  -p x -k modules
+-a always,exit -F arch=b64 -S init_module,finit_module,delete_module -k modules
+EOF
+augenrules --load >/dev/null 2>&1 || systemctl restart auditd
+pass "auditd active (baseline ruleset loaded)"
 
 # ─── 13. Legal banners ───────────────────────────────────────────────────────
 
