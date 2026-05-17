@@ -82,5 +82,3 @@ ssh -N -L 19999:localhost:19999 youruser@your-server-ip
 ```
 
 Lynis report: `/var/log/lynis.log`
-
-> Setting up Docker, configuring VS Code Remote-SSH, or other post-install tasks on the hardened box? See [POST-INSTALL.md](POST-INSTALL.md).
