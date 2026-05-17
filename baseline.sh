@@ -243,12 +243,13 @@ systemctl enable --now cockpit.socket -q
 pass "Cockpit installed"
 note "Access: ssh -N -L 9090:localhost:9090 $NEW_USER@$SERVER_IP → https://localhost:9090"
 
-if command -v netdata &>/dev/null; then
+if [[ -x /opt/netdata/bin/netdata ]] || systemctl list-unit-files 2>/dev/null | grep -q '^netdata\.service'; then
   pass "Netdata already installed (preserved)"
-else
-  bash <(curl -Ss https://my-netdata.io/kickstart.sh) \
-    --dont-wait --noupdate --disable-telemetry > /dev/null 2>&1 || warn "Netdata install failed — install manually"
+elif bash <(curl -Ss https://my-netdata.io/kickstart.sh) \
+       --dont-wait --noupdate --disable-telemetry > /dev/null 2>&1; then
   pass "Netdata installed"
+else
+  warn "Netdata install failed — install manually"
 fi
 note "Access: ssh -N -L 19999:localhost:19999 $NEW_USER@$SERVER_IP → http://localhost:19999"
 
