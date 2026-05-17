@@ -12,6 +12,12 @@ This document covers what to do **after** `baseline.sh` finishes — things you'
 - [Installing additional services](#installing-additional-services)
   - [Docker on a hardened host](#docker-on-a-hardened-host)
     - [Living with the script's hardening](#living-with-the-scripts-hardening)
+- [Running and monitoring services](#running-and-monitoring-services)
+  - [Keep things actually running](#keep-things-actually-running)
+  - [Check status from the terminal](#check-status-from-the-terminal)
+  - [Browser dashboards via SSH tunnel](#browser-dashboards-via-ssh-tunnel)
+  - [VS Code Container Tools sidebar](#vs-code-container-tools-sidebar)
+  - [A pragmatic combo](#a-pragmatic-combo)
 
 ## Compatibility
 
@@ -102,3 +108,76 @@ Three habits worth forming, all driven by what `baseline.sh` already configured:
 - **Expect AIDE and rkhunter noise around `/var/lib/docker`.** Both scanners will report constant changes under Docker's data directory because images and containers churn there. Either tune those tools to ignore `/var/lib/docker` and `/var/lib/containerd`, or learn to skim past container-related diffs when reviewing reports.
 
 That's the whole post-install for Docker: one apt sequence, one optional group add, three habits.
+
+## Running and monitoring services
+
+Once you've installed Docker and started building things, the next concern is keeping projects up and knowing what they're doing without sitting at the terminal. The box is headless, so visibility is the part that's easiest to neglect — these are the four layers to think about.
+
+### Keep things actually running
+
+Anything you start as a foreground process in an SSH session dies the moment you disconnect, the box reboots, or the process crashes. Three legitimate ways to keep something up:
+
+- **Docker with `--restart unless-stopped`** (or `restart: unless-stopped` in a compose file). Docker auto-starts these containers on boot and restarts them if they crash. Natural default if Docker is already your workflow.
+- **systemd units** for non-containerized services. Write a unit file at `/etc/systemd/system/myapp.service`, then `sudo systemctl enable --now myapp`. `Restart=on-failure` handles crashes; `enable` covers boot.
+- **tmux / screen** are for *interactive* sessions you want to detach from and reattach later — long builds, REPLs, ad-hoc debugging. Not for production processes, and they don't survive reboots.
+
+### Check status from the terminal
+
+For Docker:
+
+```bash
+docker ps                # what's running
+docker stats             # live CPU/memory per container
+docker logs -f myapp     # tail logs (Ctrl-C to stop tailing)
+docker compose ps        # status of a compose stack
+```
+
+For systemd services:
+
+```bash
+systemctl status myapp
+journalctl -u myapp -f
+```
+
+For "is it actually listening on a port?":
+
+```bash
+ss -tlnp                 # all listening TCP ports and the owning process
+```
+
+`ss -tlnp` is the truth. If your container says it's running but `ss` doesn't show its port, the publish flag is wrong or the process bound to a different interface — start debugging there.
+
+### Browser dashboards via SSH tunnel
+
+The script already installed Cockpit and Netdata; you just haven't tunneled to them yet. Both are intentionally **not** exposed in UFW — access is local-only via SSH forwarding, so a leaked dashboard URL can't be reached from the internet.
+
+**Cockpit** — service list, system resources, journal logs, an embedded terminal, package updates:
+
+```bash
+ssh -N -L 9090:localhost:9090 you@vps
+# then open https://localhost:9090 in your browser
+```
+
+For Docker visibility inside Cockpit, install `cockpit-podman` (works with Docker too) or the community Docker plugin.
+
+**Netdata** — real-time per-second metrics, with **Docker container CPU/memory/network out of the box**, no configuration:
+
+```bash
+ssh -N -L 19999:localhost:19999 you@vps
+# then open http://localhost:19999 in your browser
+```
+
+For sustained use, VS Code's "Forwarded Ports" panel can hold both tunnels open in the background while you work — no need for separate `ssh -N` terminals.
+
+### VS Code Container Tools sidebar
+
+The Container Tools extension (auto-installs into `vscode-server` when you enable it remotely) adds a Docker icon to the activity bar with Containers, Images, Volumes, and Networks panes. Right-click a container for View Logs / Attach Shell / Restart / Inspect. It's effectively a click-driven replacement for `docker ps` and `docker logs` — saves real keystrokes on a workflow you'll repeat constantly.
+
+### A pragmatic combo
+
+For day-to-day operation, pick one tool per layer rather than running all of them at once:
+
+- **Stays running:** Docker `--restart unless-stopped` for containerized work, systemd for the rest.
+- **Day-to-day status and logs:** VS Code Container Tools sidebar (containers) or `journalctl -u name -f` (systemd services).
+- **"How healthy is the box, where is the load going?":** Netdata via tunnel — leave it open in a browser tab while you work.
+- **Service config / system overview:** Cockpit via tunnel — open it when you need it, not always.
