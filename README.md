@@ -18,8 +18,10 @@ Most hardening scripts lock your server and disappear. This one installs the too
 
 | Step | What |
 |---|---|
-| System updates | Upgrades all packages, enables automatic security patches |
-| Sudo user | Creates a non-root account, copies your SSH key |
+| System updates | Upgrades all installed packages to current versions |
+| Automatic security updates | Installs `unattended-upgrades` so security patches apply on their own |
+| Sudo user | Creates a non-root account with passwordless sudo |
+| SSH key | Copies `/root/.ssh/authorized_keys` to the new user |
 | SSH hardening | Disables root login and password auth, key-only, restricts forwarding/sessions |
 | Firewall | UFW — ports 22, 80, 443 open; everything else denied |
 | fail2ban | Bans IPs after 5 failed SSH attempts (1h ban) |
