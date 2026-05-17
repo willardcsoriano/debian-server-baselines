@@ -139,7 +139,7 @@ fi
 # ─── 6. SSH hardening ────────────────────────────────────────────────────────
 
 section "6/18  SSH hardening"
-cp "$SSHD_CONFIG" "$SSHD_CONFIG.bak.$(date +%Y%m%d)"
+cp "$SSHD_CONFIG" "$SSHD_CONFIG.bak.$(date +%Y%m%d-%H%M%S)"
 
 set_sshd PermitRootLogin        no
 set_sshd PasswordAuthentication no
@@ -174,7 +174,9 @@ pass "UFW enabled — ports 22, 80, 443 open"
 
 section "8/18  Brute-force protection (fail2ban)"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq fail2ban
-cat > /etc/fail2ban/jail.local <<'EOF'
+mkdir -p /etc/fail2ban/jail.d
+cat > /etc/fail2ban/jail.d/00-baseline.conf <<'EOF'
+# Managed by debian-baseline. Place user overrides in /etc/fail2ban/jail.local
 [DEFAULT]
 bantime  = 1h
 findtime = 10m
@@ -184,7 +186,25 @@ maxretry = 5
 enabled = true
 port    = 22
 EOF
+# Migrate from earlier versions that wrote /etc/fail2ban/jail.local.
+# If jail.local matches what an older baseline run would have written,
+# remove it so the user-owned jail.local stays clean for their overrides.
+if [[ -f /etc/fail2ban/jail.local ]]; then
+  OLD_JAIL_LOCAL="[DEFAULT]
+bantime  = 1h
+findtime = 10m
+maxretry = 5
+
+[sshd]
+enabled = true
+port    = 22"
+  if [[ "$(cat /etc/fail2ban/jail.local)" == "$OLD_JAIL_LOCAL" ]]; then
+    rm /etc/fail2ban/jail.local
+    note "Migrated jail.local → jail.d/00-baseline.conf (user override slot freed)"
+  fi
+fi
 systemctl enable --now fail2ban -q
+systemctl reload fail2ban 2>/dev/null || systemctl restart fail2ban -q 2>/dev/null || true
 pass "fail2ban active — 5 failed attempts → 1h ban"
 
 # ─── 9. Kernel hardening ─────────────────────────────────────────────────────
@@ -249,7 +269,7 @@ pass "auditd active"
 # ─── 13. Legal banners ───────────────────────────────────────────────────────
 
 section "13/18 Legal banners"
-cat > /etc/issue <<'EOF'
+BANNER=$(cat <<'EOF'
 **************************************************************************
 *                                                                        *
 *  Authorized access only. All activity is logged and monitored.         *
@@ -257,8 +277,23 @@ cat > /etc/issue <<'EOF'
 *                                                                        *
 **************************************************************************
 EOF
-cp /etc/issue /etc/issue.net
-pass "Legal banners installed (/etc/issue, /etc/issue.net)"
+)
+write_banner() {
+  local target="$1" current=""
+  [[ -f "$target" ]] && current=$(cat "$target")
+  # Overwrite only if: missing, empty, default Debian banner, or already our banner.
+  # Anything else is treated as user customization and preserved.
+  if [[ -z "$current" ]] \
+     || [[ "$current" == *"Debian GNU/Linux"* ]] \
+     || [[ "$current" == "$BANNER" ]]; then
+    printf '%s\n' "$BANNER" > "$target"
+    pass "$target installed"
+  else
+    warn "$target customized — leaving untouched"
+  fi
+}
+write_banner /etc/issue
+write_banner /etc/issue.net
 
 # ─── 14. Password policy ─────────────────────────────────────────────────────
 
