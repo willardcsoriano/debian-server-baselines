@@ -443,6 +443,21 @@ pass "Process accounting (acct + sysstat) active"
 # ─── 18. Lynis ───────────────────────────────────────────────────────────────
 
 section "18/18 Security audit (Lynis)"
+# LYNIS suggestion: Debian's lynis package lags upstream by months. Pin to
+# CISOfy's apt repo so we get the current release and the latest test set.
+# Keys live in /etc/apt/keyrings/ per modern Debian convention; the sources
+# file is namespaced (cisofy-lynis.list) so we never collide with other repos.
+mkdir -p /etc/apt/keyrings
+if [[ ! -f /etc/apt/keyrings/cisofy.gpg ]]; then
+  curl -fsSL https://packages.cisofy.com/keys/cisofy-software-public.key \
+    | gpg --dearmor -o /etc/apt/keyrings/cisofy.gpg
+  chmod 644 /etc/apt/keyrings/cisofy.gpg
+fi
+if [[ ! -f /etc/apt/sources.list.d/cisofy-lynis.list ]]; then
+  echo "deb [arch=amd64,arm64 signed-by=/etc/apt/keyrings/cisofy.gpg] https://packages.cisofy.com/community/lynis/deb/ stable main" \
+    > /etc/apt/sources.list.d/cisofy-lynis.list
+  apt-get update -qq
+fi
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq lynis
 if [[ ! -f /var/log/lynis-baseline.log ]]; then
   lynis audit system --quiet --nocolors > /var/log/lynis-baseline.log 2>&1 || true
