@@ -137,12 +137,25 @@ pass "$NEW_USER in sudo group (password required)"
 section "4/20  SSH key"
 USER_HOME="/home/$NEW_USER"
 mkdir -p "$USER_HOME/.ssh"
-if [[ -s "$USER_HOME/.ssh/authorized_keys" ]]; then
-  pass "authorized_keys already present for $NEW_USER (preserved)"
+touch "$USER_HOME/.ssh/authorized_keys"
+# Ensure every key from root is present — merge rather than copy-if-empty so
+# re-runs and pre-existing accounts (e.g. created by a VPS image) always have
+# the key that root was using, even if the file already contained other keys.
+_added=0
+while IFS= read -r _keyline; do
+  [[ -z "$_keyline" || "$_keyline" == \#* ]] && continue
+  _keymaterial=$(awk '{print $2}' <<<"$_keyline")
+  if ! grep -qF "$_keymaterial" "$USER_HOME/.ssh/authorized_keys"; then
+    echo "$_keyline" >> "$USER_HOME/.ssh/authorized_keys"
+    (( _added++ )) || true
+  fi
+done < /root/.ssh/authorized_keys
+if [[ $_added -gt 0 ]]; then
+  pass "SSH key merged into $NEW_USER authorized_keys ($_added key(s) added)"
 else
-  cp /root/.ssh/authorized_keys "$USER_HOME/.ssh/authorized_keys"
-  pass "SSH key copied from root to $NEW_USER"
+  pass "authorized_keys verified for $NEW_USER (root keys already present)"
 fi
+chmod 755 "$USER_HOME"  # sshd StrictModes: home dir must not be group/world-writable
 chown -R "$NEW_USER:$NEW_USER" "$USER_HOME/.ssh"
 chmod 700 "$USER_HOME/.ssh"
 chmod 600 "$USER_HOME/.ssh/authorized_keys"
