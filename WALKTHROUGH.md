@@ -4,6 +4,48 @@ Plain-English guide to what `baseline.sh` does to your machine. Walk through eac
 
 This document complements `README.md` (the one-glance feature table). Read this when you want to actually understand what's running on your box.
 
+## Contents
+
+**Overview**
+
+- [At a glance](#at-a-glance)
+
+**Setup**
+
+- [Pre-flight checks](#pre-flight-before-any-section-runs)
+
+**The 18 sections**
+
+- [1/18 — System updates](#118--system-updates)
+- [2/18 — Automatic security updates](#218--automatic-security-updates)
+- [3/18 — Sudo user](#318--sudo-user)
+- [4/18 — SSH key copy](#418--ssh-key-copy)
+- [5/18 — SSH safety check](#518--ssh-safety-check-first-run-only)
+- [6/18 — SSH hardening](#618--ssh-hardening)
+- [7/18 — Firewall (UFW)](#718--firewall-ufw)
+- [8/18 — fail2ban (brute-force protection)](#818--fail2ban-brute-force-protection)
+- [9/18 — Kernel hardening (sysctl)](#918--kernel-hardening-sysctl)
+- [10/18 — AppArmor](#1018--apparmor)
+- [11/18 — Monitoring (Cockpit + Netdata)](#1118--monitoring-cockpit--netdata)
+- [12/18 — Intrusion detection (rkhunter + auditd + AIDE)](#1218--intrusion-detection-rkhunter--auditd--aide)
+- [13/18 — Legal banners](#1318--legal-banners)
+- [14/18 — Password policy (login.defs)](#1418--password-policy-logindefs)
+- [15/18 — Debian goodies + PAM strength](#1518--debian-goodies--pam-strength)
+- [16/18 — Disable unused kernel modules + restrict compilers](#1618--disable-unused-kernel-modules--restrict-compilers)
+- [17/18 — Process accounting (acct + sysstat)](#1718--process-accounting-acct--sysstat)
+- [18/18 — Security audit (Lynis)](#1818--security-audit-lynis)
+
+**Reference**
+
+- [Where things live (paths cheatsheet)](#where-things-live-paths-cheatsheet)
+- [How to use the box after the script runs](#how-to-use-the-box-after-the-script-runs)
+- [What re-running the script does (and doesn't)](#what-re-running-the-script-does-and-doesnt)
+- [Deliberate gaps (what this script does NOT do)](#deliberate-gaps-what-this-script-does-not-do)
+- [Troubleshooting](#troubleshooting)
+- [A note on running this on a desktop (not a server)](#a-note-on-running-this-on-a-desktop-not-a-server)
+
+---
+
 ## At a glance
 
 If you only have 60 seconds, here's what changes about your box after `baseline.sh` finishes.
@@ -47,46 +89,6 @@ If you only have 60 seconds, here's what changes about your box after `baseline.
 - Desktops or laptops — [see why](#a-note-on-running-this-on-a-desktop-not-a-server)
 - Anything pre-Debian 13
 - A box without an SSH public key in `/root/.ssh/authorized_keys` before you start (the script refuses to run)
-
-## Contents
-
-**Overview**
-
-- [At a glance](#at-a-glance)
-
-**Setup**
-
-- [Pre-flight checks](#pre-flight-before-any-section-runs)
-
-**The 18 sections**
-
-- [1/18 — System updates](#118--system-updates)
-- [2/18 — Automatic security updates](#218--automatic-security-updates)
-- [3/18 — Sudo user](#318--sudo-user)
-- [4/18 — SSH key copy](#418--ssh-key-copy)
-- [5/18 — SSH safety check](#518--ssh-safety-check-first-run-only)
-- [6/18 — SSH hardening](#618--ssh-hardening)
-- [7/18 — Firewall (UFW)](#718--firewall-ufw)
-- [8/18 — fail2ban (brute-force protection)](#818--fail2ban-brute-force-protection)
-- [9/18 — Kernel hardening (sysctl)](#918--kernel-hardening-sysctl)
-- [10/18 — AppArmor](#1018--apparmor)
-- [11/18 — Monitoring (Cockpit + Netdata)](#1118--monitoring-cockpit--netdata)
-- [12/18 — Intrusion detection (rkhunter + auditd + AIDE)](#1218--intrusion-detection-rkhunter--auditd--aide)
-- [13/18 — Legal banners](#1318--legal-banners)
-- [14/18 — Password policy (login.defs)](#1418--password-policy-logindefs)
-- [15/18 — Debian goodies + PAM strength](#1518--debian-goodies--pam-strength)
-- [16/18 — Disable unused kernel modules + restrict compilers](#1618--disable-unused-kernel-modules--restrict-compilers)
-- [17/18 — Process accounting (acct + sysstat)](#1718--process-accounting-acct--sysstat)
-- [18/18 — Security audit (Lynis)](#1818--security-audit-lynis)
-
-**Reference**
-
-- [Where things live (paths cheatsheet)](#where-things-live-paths-cheatsheet)
-- [How to use the box after the script runs](#how-to-use-the-box-after-the-script-runs)
-- [What re-running the script does (and doesn't)](#what-re-running-the-script-does-and-doesnt)
-- [Deliberate gaps (what this script does NOT do)](#deliberate-gaps-what-this-script-does-not-do)
-- [Troubleshooting](#troubleshooting)
-- [A note on running this on a desktop (not a server)](#a-note-on-running-this-on-a-desktop-not-a-server)
 
 ---
 
