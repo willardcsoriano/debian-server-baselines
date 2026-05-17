@@ -37,6 +37,7 @@ Most hardening scripts lock your server and disappear. This one installs the too
 | Compiler restriction | `gcc`, `g++`, `cc`, `as` (and versioned variants) set to mode 750 — root-only, defeats local-privesc exploit building |
 | Process accounting | `acct` + `sysstat` for command and resource history |
 | Lynis | Security audit — scores your server, flags what to fix next |
+| Operator tooling | Installs `git`, `tmux`, `jq` — not present on Debian minimal, needed to operate the box |
 
 ## Requirements
 

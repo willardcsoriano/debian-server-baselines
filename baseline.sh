@@ -78,21 +78,21 @@ set_login_def() {
 
 # ─── 1. System updates ────────────────────────────────────────────────────────
 
-section "1/18  System updates"
+section "1/19  System updates"
 apt-get update -qq
 DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq
 pass "All packages updated"
 
 # ─── 2. Automatic security updates ───────────────────────────────────────────
 
-section "2/18  Automatic security updates"
+section "2/19  Automatic security updates"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq unattended-upgrades
 systemctl enable --now unattended-upgrades -q
 pass "unattended-upgrades active"
 
 # ─── 3. Sudo user ─────────────────────────────────────────────────────────────
 
-section "3/18  Sudo user ($NEW_USER)"
+section "3/19  Sudo user ($NEW_USER)"
 if id "$NEW_USER" &>/dev/null; then
   warn "User $NEW_USER already exists — skipping creation"
 else
@@ -119,7 +119,7 @@ pass "$NEW_USER in sudo group (password required)"
 
 # ─── 4. Copy SSH key ──────────────────────────────────────────────────────────
 
-section "4/18  SSH key"
+section "4/19  SSH key"
 USER_HOME="/home/$NEW_USER"
 mkdir -p "$USER_HOME/.ssh"
 if [[ -s "$USER_HOME/.ssh/authorized_keys" ]]; then
@@ -134,7 +134,7 @@ chmod 600 "$USER_HOME/.ssh/authorized_keys"
 
 # ─── 5. Safety check ─────────────────────────────────────────────────────────
 
-section "5/18  SSH safety check"
+section "5/19  SSH safety check"
 if [[ $RERUN -eq 1 ]]; then
   pass "SSH already hardened — skipping interactive confirmation"
 else
@@ -151,7 +151,7 @@ fi
 
 # ─── 6. SSH hardening ────────────────────────────────────────────────────────
 
-section "6/18  SSH hardening"
+section "6/19  SSH hardening"
 cp "$SSHD_CONFIG" "$SSHD_CONFIG.bak.$(date +%Y%m%d-%H%M%S)"
 
 set_sshd PermitRootLogin        no
@@ -180,7 +180,7 @@ pass "SSH hardened (root off, key-only, restricted forwarding/sessions, AllowUse
 
 # ─── 7. Firewall ──────────────────────────────────────────────────────────────
 
-section "7/18  Firewall (UFW)"
+section "7/19  Firewall (UFW)"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ufw
 ufw default deny incoming  > /dev/null
 ufw default allow outgoing > /dev/null
@@ -192,7 +192,7 @@ pass "UFW enabled — ports 22, 80, 443 open"
 
 # ─── 8. fail2ban ─────────────────────────────────────────────────────────────
 
-section "8/18  Brute-force protection (fail2ban)"
+section "8/19  Brute-force protection (fail2ban)"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq fail2ban
 mkdir -p /etc/fail2ban/jail.d
 cat > /etc/fail2ban/jail.d/00-baseline.conf <<'EOF'
@@ -239,7 +239,7 @@ pass "fail2ban active — 5 failed attempts → 1h ban"
 
 # ─── 9. Kernel hardening ─────────────────────────────────────────────────────
 
-section "9/18  Kernel hardening (sysctl)"
+section "9/19  Kernel hardening (sysctl)"
 cat > /etc/sysctl.d/99-hardening.conf <<'EOF'
 net.ipv4.tcp_syncookies = 1
 net.ipv4.conf.all.rp_filter = 1
@@ -266,7 +266,7 @@ pass "Kernel parameters applied"
 
 # ─── 10. AppArmor ────────────────────────────────────────────────────────────
 
-section "10/18 AppArmor"
+section "10/19 AppArmor"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq apparmor apparmor-utils
 systemctl enable --now apparmor -q
 ENFORCED=$(aa-status 2>/dev/null | grep "profiles are in enforce mode" | grep -oP '^\d+' || echo "?")
@@ -274,7 +274,7 @@ pass "AppArmor active ($ENFORCED profiles enforcing)"
 
 # ─── 11. Cockpit + Netdata ───────────────────────────────────────────────────
 
-section "11/18 Monitoring (Cockpit + Netdata)"
+section "11/19 Monitoring (Cockpit + Netdata)"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cockpit
 systemctl enable --now cockpit.socket -q
 pass "Cockpit installed"
@@ -294,7 +294,7 @@ note "Access: ssh -N -L 19999:localhost:19999 $NEW_USER@$SERVER_IP → http://lo
 
 # ─── 12. rkhunter + auditd ───────────────────────────────────────────────────
 
-section "12/18 Intrusion detection (rkhunter + auditd + AIDE)"
+section "12/19 Intrusion detection (rkhunter + auditd + AIDE)"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq rkhunter auditd aide
 rkhunter --update --quiet 2>/dev/null || true
 if [[ ! -f /var/lib/rkhunter/db/rkhunter.dat ]]; then
@@ -365,7 +365,7 @@ pass "auditd active (baseline ruleset loaded)"
 
 # ─── 13. Legal banners ───────────────────────────────────────────────────────
 
-section "13/18 Legal banners"
+section "13/19 Legal banners"
 BANNER=$(cat <<'EOF'
 **************************************************************************
 *                                                                        *
@@ -394,7 +394,7 @@ write_banner /etc/issue.net
 
 # ─── 14. Password policy ─────────────────────────────────────────────────────
 
-section "14/18 Password policy (login.defs)"
+section "14/19 Password policy (login.defs)"
 set_login_def PASS_MAX_DAYS         90
 set_login_def PASS_MIN_DAYS         1
 set_login_def PASS_WARN_AGE         7
@@ -414,9 +414,9 @@ pass "Password aging + umask 027 + SHA512 rounds configured (applied to existing
 
 # ─── 15. Debian goodies + PAM strength ───────────────────────────────────────
 
-section "15/18 Debian goodies + PAM strength"
+section "15/19 Debian goodies + PAM strength"
 # Pre-seed needrestart's config so its first invocation (during its own
-# install, and apt installs in sections 17/18) auto-restarts deferred
+# install, and apt installs in sections 17/19) auto-restarts deferred
 # services and stops printing the "Services to be restarted" list.
 # Creating the dir before needrestart owns it is fine — root:root, 0755
 # is what the package would set anyway.
@@ -444,7 +444,7 @@ pass "libpam-tmpdir, libpam-passwdqc, apt safety nets installed (debsums cron: d
 
 # ─── 16. Disable unused kernel modules ───────────────────────────────────────
 
-section "16/18 Disable unused kernel modules"
+section "16/19 Disable unused kernel modules"
 cat > /etc/modprobe.d/blacklist-rare-network.conf <<'EOF'
 install dccp /bin/true
 install sctp /bin/true
@@ -480,7 +480,7 @@ fi
 
 # ─── 17. Process accounting ──────────────────────────────────────────────────
 
-section "17/18 Process accounting (acct + sysstat)"
+section "17/19 Process accounting (acct + sysstat)"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq acct sysstat
 systemctl enable --now acct.service -q 2>/dev/null || \
   systemctl enable --now psacct.service -q 2>/dev/null || true
@@ -490,7 +490,7 @@ pass "Process accounting (acct + sysstat) active"
 
 # ─── 18. Lynis ───────────────────────────────────────────────────────────────
 
-section "18/18 Security audit (Lynis)"
+section "18/19 Security audit (Lynis)"
 # LYNIS suggestion: Debian's lynis package lags upstream by months. Pin to
 # CISOfy's apt repo so we get the current release and the latest test set.
 # Keys live in /etc/apt/keyrings/ per modern Debian convention; the sources
@@ -516,6 +516,12 @@ else
 fi
 SCORE=$(grep "Hardening index" /var/log/lynis.log 2>/dev/null | tail -1 | grep -oP 'Hardening index : \[\K\d+' || echo "?")
 pass "Hardening index: $SCORE"
+
+# ─── 19. Operator tooling ────────────────────────────────────────────────────
+
+section "19/19 Operator tooling"
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git tmux jq
+pass "git, tmux, jq installed"
 
 # ─── Summary ─────────────────────────────────────────────────────────────────
 
@@ -543,6 +549,7 @@ echo -e "  ${GREEN}✓${NC} Debian-goodies + PAM strength installed"
 echo -e "  ${GREEN}✓${NC} Unused kernel modules blacklisted"
 echo -e "  ${GREEN}✓${NC} Process accounting (acct + sysstat) active"
 echo -e "  ${GREEN}✓${NC} Lynis: hardening index ${BOLD}$SCORE${NC}"
+echo -e "  ${GREEN}✓${NC} Operator tooling: git, tmux, jq"
 echo ""
 echo -e "  ${YELLOW}Root SSH is disabled.${NC} Log in as: ${BOLD}ssh $NEW_USER@$SERVER_IP${NC}"
 echo -e "  ${YELLOW}Lynis report:${NC} /var/log/lynis.log"
