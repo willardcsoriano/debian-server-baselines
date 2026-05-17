@@ -19,7 +19,7 @@ echo -e "${BOLD}debian-baseline${NC}"
 echo -e "${DIM}Debian 13 server hardening — github.com/willardcsoriano/debian-baseline${NC}"
 echo ""
 
-[[ $EUID -ne 0 ]]          && fail "Must run as root."
+[[ $EUID -ne 0 ]]          && fail "Must run as root (or via sudo)."
 [[ -f /etc/os-release ]]   || fail "Cannot detect OS."
 . /etc/os-release
 [[ "$ID" == "debian" ]]    || fail "Debian only. Detected: $ID"
@@ -28,10 +28,23 @@ echo ""
 SERVER_IP=$(hostname -I | awk '{print $1}')
 pass "Debian $VERSION_ID ($VERSION_CODENAME) on $SERVER_IP"
 
+# Re-run detection: SSH already hardened means this server has run baseline before
+RERUN=0
+if [[ -f /etc/ssh/sshd_config ]] && grep -qE "^PermitRootLogin\s+no" /etc/ssh/sshd_config; then
+  RERUN=1
+  note "Re-run detected — idempotent steps will skip prompts where safe."
+fi
+
 # ─── Username ─────────────────────────────────────────────────────────────────
 
 echo ""
-read -rp "  Sudo username to create: " NEW_USER
+EXISTING_SUDO=$(getent group sudo | cut -d: -f4 | tr ',' '\n' | grep -v '^$' | grep -v '^root$' | head -1)
+if [[ -n "$EXISTING_SUDO" ]]; then
+  read -rp "  Sudo username [$EXISTING_SUDO]: " NEW_USER
+  NEW_USER="${NEW_USER:-$EXISTING_SUDO}"
+else
+  read -rp "  Sudo username to create: " NEW_USER
+fi
 echo ""
 
 [[ -z "$NEW_USER" ]]                           && fail "Username cannot be empty."
@@ -40,63 +53,9 @@ echo ""
 [[ ! -f /root/.ssh/authorized_keys ]]          && fail "No SSH key at /root/.ssh/authorized_keys. Cannot proceed safely."
 [[ ! -s /root/.ssh/authorized_keys ]]          && fail "authorized_keys is empty. Add your public key first."
 
-# ─── 1. System updates ────────────────────────────────────────────────────────
+# ─── Helpers ──────────────────────────────────────────────────────────────────
 
-section "1/13  System updates"
-apt-get update -qq
-DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq
-pass "All packages updated"
-
-# ─── 2. Automatic security updates ───────────────────────────────────────────
-
-section "2/13  Automatic security updates"
-DEBIAN_FRONTEND=noninteractive apt-get install -y -qq unattended-upgrades
-systemctl enable --now unattended-upgrades -q
-pass "unattended-upgrades active"
-
-# ─── 3. Sudo user ─────────────────────────────────────────────────────────────
-
-section "3/13  Sudo user ($NEW_USER)"
-if id "$NEW_USER" &>/dev/null; then
-  warn "User $NEW_USER already exists — skipping creation"
-else
-  adduser --gecos "" --disabled-password "$NEW_USER" -q
-  pass "User $NEW_USER created"
-fi
-usermod -aG sudo "$NEW_USER"
-echo "$NEW_USER ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/"$NEW_USER"
-chmod 440 /etc/sudoers.d/"$NEW_USER"
-pass "$NEW_USER added to sudo"
-
-# ─── 4. Copy SSH key ──────────────────────────────────────────────────────────
-
-section "4/13  SSH key"
-USER_HOME="/home/$NEW_USER"
-mkdir -p "$USER_HOME/.ssh"
-cp /root/.ssh/authorized_keys "$USER_HOME/.ssh/authorized_keys"
-chown -R "$NEW_USER:$NEW_USER" "$USER_HOME/.ssh"
-chmod 700 "$USER_HOME/.ssh"
-chmod 600 "$USER_HOME/.ssh/authorized_keys"
-pass "SSH key copied to $NEW_USER"
-
-# ─── 5. Safety check ─────────────────────────────────────────────────────────
-
-section "5/13  SSH safety check"
-echo ""
-echo -e "  ${YELLOW}Before locking down SSH, verify the new account works.${NC}"
-echo ""
-echo -e "  Open a new terminal and run:"
-echo -e "  ${BOLD}    ssh $NEW_USER@$SERVER_IP${NC}"
-echo ""
-read -rp "  Type 'yes' to confirm login worked: " CONFIRMED
-[[ "$CONFIRMED" != "yes" ]] && fail "Aborted. Resolve SSH access before continuing."
-pass "SSH access confirmed"
-
-# ─── 6. SSH hardening ────────────────────────────────────────────────────────
-
-section "6/13  SSH hardening"
 SSHD_CONFIG="/etc/ssh/sshd_config"
-cp "$SSHD_CONFIG" "$SSHD_CONFIG.bak.$(date +%Y%m%d)"
 
 set_sshd() {
   local key="$1" val="$2"
@@ -107,33 +66,112 @@ set_sshd() {
   fi
 }
 
+set_login_def() {
+  local key="$1" val="$2" file="/etc/login.defs"
+  if grep -qE "^#?\s*${key}\b" "$file"; then
+    sed -i -E "s|^#?\s*${key}.*|${key}\t${val}|" "$file"
+  else
+    printf '%s\t%s\n' "${key}" "${val}" >> "$file"
+  fi
+}
+
+# ─── 1. System updates ────────────────────────────────────────────────────────
+
+section "1/18  System updates"
+apt-get update -qq
+DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq
+pass "All packages updated"
+
+# ─── 2. Automatic security updates ───────────────────────────────────────────
+
+section "2/18  Automatic security updates"
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq unattended-upgrades
+systemctl enable --now unattended-upgrades -q
+pass "unattended-upgrades active"
+
+# ─── 3. Sudo user ─────────────────────────────────────────────────────────────
+
+section "3/18  Sudo user ($NEW_USER)"
+if id "$NEW_USER" &>/dev/null; then
+  warn "User $NEW_USER already exists — skipping creation"
+else
+  adduser --gecos "" --disabled-password "$NEW_USER" -q
+  pass "User $NEW_USER created"
+fi
+usermod -aG sudo "$NEW_USER"
+echo "$NEW_USER ALL=(ALL) NOPASSWD:ALL" > /etc/sudoers.d/"$NEW_USER"
+chmod 440 /etc/sudoers.d/"$NEW_USER"
+pass "$NEW_USER in sudo group (NOPASSWD)"
+
+# ─── 4. Copy SSH key ──────────────────────────────────────────────────────────
+
+section "4/18  SSH key"
+USER_HOME="/home/$NEW_USER"
+mkdir -p "$USER_HOME/.ssh"
+if [[ -s "$USER_HOME/.ssh/authorized_keys" ]]; then
+  pass "authorized_keys already present for $NEW_USER (preserved)"
+else
+  cp /root/.ssh/authorized_keys "$USER_HOME/.ssh/authorized_keys"
+  pass "SSH key copied from root to $NEW_USER"
+fi
+chown -R "$NEW_USER:$NEW_USER" "$USER_HOME/.ssh"
+chmod 700 "$USER_HOME/.ssh"
+chmod 600 "$USER_HOME/.ssh/authorized_keys"
+
+# ─── 5. Safety check ─────────────────────────────────────────────────────────
+
+section "5/18  SSH safety check"
+if [[ $RERUN -eq 1 ]]; then
+  pass "SSH already hardened — skipping interactive confirmation"
+else
+  echo ""
+  echo -e "  ${YELLOW}Before locking down SSH, verify the new account works.${NC}"
+  echo ""
+  echo -e "  Open a new terminal and run:"
+  echo -e "  ${BOLD}    ssh $NEW_USER@$SERVER_IP${NC}"
+  echo ""
+  read -rp "  Type 'yes' to confirm login worked: " CONFIRMED
+  [[ "$CONFIRMED" != "yes" ]] && fail "Aborted. Resolve SSH access before continuing."
+  pass "SSH access confirmed"
+fi
+
+# ─── 6. SSH hardening ────────────────────────────────────────────────────────
+
+section "6/18  SSH hardening"
+cp "$SSHD_CONFIG" "$SSHD_CONFIG.bak.$(date +%Y%m%d)"
+
 set_sshd PermitRootLogin        no
 set_sshd PasswordAuthentication no
 set_sshd PubkeyAuthentication   yes
-set_sshd MaxAuthTries            3
-set_sshd LoginGraceTime          30
-set_sshd X11Forwarding           no
+set_sshd MaxAuthTries           3
+set_sshd LoginGraceTime         30
+set_sshd X11Forwarding          no
+set_sshd AllowTcpForwarding     no
+set_sshd AllowAgentForwarding   no
+set_sshd MaxSessions            2
+set_sshd ClientAliveCountMax    2
+set_sshd LogLevel               VERBOSE
+set_sshd TCPKeepAlive           no
 
 sshd -t || fail "sshd_config invalid — original backed up to $SSHD_CONFIG.bak.*"
 systemctl reload sshd
-pass "SSH hardened (root login off, key-only auth)"
+pass "SSH hardened (root off, key-only, restricted forwarding/sessions)"
 
 # ─── 7. Firewall ──────────────────────────────────────────────────────────────
 
-section "7/13  Firewall (UFW)"
+section "7/18  Firewall (UFW)"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ufw
-ufw --force reset      > /dev/null
-ufw default deny incoming > /dev/null
+ufw default deny incoming  > /dev/null
 ufw default allow outgoing > /dev/null
-ufw allow 22/tcp       > /dev/null
-ufw allow 80/tcp       > /dev/null
-ufw allow 443/tcp      > /dev/null
-ufw --force enable     > /dev/null
+for port in 22 80 443; do
+  ufw allow "$port"/tcp > /dev/null
+done
+ufw --force enable > /dev/null
 pass "UFW enabled — ports 22, 80, 443 open"
 
 # ─── 8. fail2ban ─────────────────────────────────────────────────────────────
 
-section "8/13  Brute-force protection (fail2ban)"
+section "8/18  Brute-force protection (fail2ban)"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq fail2ban
 cat > /etc/fail2ban/jail.local <<'EOF'
 [DEFAULT]
@@ -150,7 +188,7 @@ pass "fail2ban active — 5 failed attempts → 1h ban"
 
 # ─── 9. Kernel hardening ─────────────────────────────────────────────────────
 
-section "9/13  Kernel hardening (sysctl)"
+section "9/18  Kernel hardening (sysctl)"
 cat > /etc/sysctl.d/99-hardening.conf <<'EOF'
 net.ipv4.tcp_syncookies = 1
 net.ipv4.conf.all.rp_filter = 1
@@ -170,7 +208,7 @@ pass "Kernel parameters applied"
 
 # ─── 10. AppArmor ────────────────────────────────────────────────────────────
 
-section "10/13 AppArmor"
+section "10/18 AppArmor"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq apparmor apparmor-utils
 systemctl enable --now apparmor -q
 ENFORCED=$(aa-status 2>/dev/null | grep "profiles are in enforce mode" | grep -oP '^\d+' || echo "?")
@@ -178,33 +216,109 @@ pass "AppArmor active ($ENFORCED profiles enforcing)"
 
 # ─── 11. Cockpit + Netdata ───────────────────────────────────────────────────
 
-section "11/13 Monitoring (Cockpit + Netdata)"
+section "11/18 Monitoring (Cockpit + Netdata)"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cockpit
 systemctl enable --now cockpit.socket -q
 pass "Cockpit installed"
 note "Access: ssh -N -L 9090:localhost:9090 $NEW_USER@$SERVER_IP → https://localhost:9090"
 
-bash <(curl -Ss https://my-netdata.io/kickstart.sh) \
-  --dont-wait --noupdate --disable-telemetry > /dev/null 2>&1 || warn "Netdata install failed — install manually"
-pass "Netdata installed"
+if command -v netdata &>/dev/null; then
+  pass "Netdata already installed (preserved)"
+else
+  bash <(curl -Ss https://my-netdata.io/kickstart.sh) \
+    --dont-wait --noupdate --disable-telemetry > /dev/null 2>&1 || warn "Netdata install failed — install manually"
+  pass "Netdata installed"
+fi
 note "Access: ssh -N -L 19999:localhost:19999 $NEW_USER@$SERVER_IP → http://localhost:19999"
 
 # ─── 12. rkhunter + auditd ───────────────────────────────────────────────────
 
-section "12/13 Intrusion detection (rkhunter + auditd)"
+section "12/18 Intrusion detection (rkhunter + auditd)"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq rkhunter auditd
-rkhunter --update  --quiet 2>/dev/null || true
-rkhunter --propupd --quiet 2>/dev/null || true
+rkhunter --update --quiet 2>/dev/null || true
+if [[ ! -f /var/lib/rkhunter/db/rkhunter.dat ]]; then
+  rkhunter --propupd --quiet 2>/dev/null || true
+  pass "rkhunter baseline saved"
+else
+  pass "rkhunter database present (baseline preserved)"
+fi
 systemctl enable --now auditd -q
-pass "rkhunter baseline saved, auditd active"
+pass "auditd active"
 
-# ─── 13. Lynis ───────────────────────────────────────────────────────────────
+# ─── 13. Legal banners ───────────────────────────────────────────────────────
 
-section "13/13 Security audit (Lynis)"
+section "13/18 Legal banners"
+cat > /etc/issue <<'EOF'
+**************************************************************************
+*                                                                        *
+*  Authorized access only. All activity is logged and monitored.         *
+*  Disconnect immediately if you are not an authorized user.             *
+*                                                                        *
+**************************************************************************
+EOF
+cp /etc/issue /etc/issue.net
+pass "Legal banners installed (/etc/issue, /etc/issue.net)"
+
+# ─── 14. Password policy ─────────────────────────────────────────────────────
+
+section "14/18 Password policy (login.defs)"
+set_login_def PASS_MAX_DAYS         90
+set_login_def PASS_MIN_DAYS         1
+set_login_def PASS_WARN_AGE         7
+set_login_def UMASK                 027
+set_login_def SHA_CRYPT_MIN_ROUNDS  5000
+set_login_def SHA_CRYPT_MAX_ROUNDS  100000
+set_login_def ENCRYPT_METHOD        SHA512
+pass "Password aging + umask 027 + SHA512 rounds configured"
+
+# ─── 15. Debian goodies + PAM strength ───────────────────────────────────────
+
+section "15/18 Debian goodies + PAM strength"
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+  libpam-tmpdir libpam-passwdqc apt-listbugs apt-listchanges \
+  needrestart debsums apt-show-versions
+pass "libpam-tmpdir, libpam-passwdqc, apt safety nets installed"
+
+# ─── 16. Disable unused kernel modules ───────────────────────────────────────
+
+section "16/18 Disable unused kernel modules"
+cat > /etc/modprobe.d/blacklist-rare-network.conf <<'EOF'
+install dccp /bin/true
+install sctp /bin/true
+install rds  /bin/true
+install tipc /bin/true
+EOF
+cat > /etc/modprobe.d/blacklist-storage.conf <<'EOF'
+blacklist usb-storage
+blacklist firewire-core
+blacklist firewire-ohci
+blacklist firewire-sbp2
+EOF
+pass "Rare network protocols + USB/Firewire storage blacklisted"
+
+# ─── 17. Process accounting ──────────────────────────────────────────────────
+
+section "17/18 Process accounting (acct + sysstat)"
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq acct sysstat
+systemctl enable --now acct.service -q 2>/dev/null || \
+  systemctl enable --now psacct.service -q 2>/dev/null || true
+sed -i 's|^ENABLED="false"|ENABLED="true"|' /etc/default/sysstat 2>/dev/null || true
+systemctl enable --now sysstat -q
+pass "Process accounting (acct + sysstat) active"
+
+# ─── 18. Lynis ───────────────────────────────────────────────────────────────
+
+section "18/18 Security audit (Lynis)"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq lynis
-lynis audit system --quiet --nocolors > /var/log/lynis-baseline.log 2>&1 || true
-SCORE=$(grep "Hardening index" /var/log/lynis.log 2>/dev/null | tail -1 | grep -oP '\d+' | head -1 || echo "see /var/log/lynis.log")
-pass "Lynis first audit complete — hardening index: $SCORE"
+if [[ ! -f /var/log/lynis-baseline.log ]]; then
+  lynis audit system --quiet --nocolors > /var/log/lynis-baseline.log 2>&1 || true
+  pass "First audit saved to /var/log/lynis-baseline.log"
+else
+  lynis audit system --quiet --nocolors > /dev/null 2>&1 || true
+  pass "Re-audit complete (baseline preserved at /var/log/lynis-baseline.log)"
+fi
+SCORE=$(grep "Hardening index" /var/log/lynis.log 2>/dev/null | tail -1 | grep -oP 'Hardening index : \[\K\d+' || echo "?")
+pass "Hardening index: $SCORE"
 
 # ─── Summary ─────────────────────────────────────────────────────────────────
 
@@ -215,15 +329,20 @@ echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 echo -e "  ${GREEN}✓${NC} System updated + auto security patches"
 echo -e "  ${GREEN}✓${NC} Sudo user: ${BOLD}$NEW_USER${NC}"
-echo -e "  ${GREEN}✓${NC} SSH: root login off, key-only auth"
+echo -e "  ${GREEN}✓${NC} SSH: root off, key-only, restricted forwarding"
 echo -e "  ${GREEN}✓${NC} Firewall: 22, 80, 443 open — all else denied"
 echo -e "  ${GREEN}✓${NC} fail2ban: brute-force protection active"
 echo -e "  ${GREEN}✓${NC} Kernel: network attack surface reduced"
 echo -e "  ${GREEN}✓${NC} AppArmor: mandatory access control active"
 echo -e "  ${GREEN}✓${NC} Cockpit + Netdata: installed, tunnel-only access"
 echo -e "  ${GREEN}✓${NC} rkhunter + auditd: intrusion detection active"
+echo -e "  ${GREEN}✓${NC} Legal banners + password policy enforced"
+echo -e "  ${GREEN}✓${NC} Debian-goodies + PAM strength installed"
+echo -e "  ${GREEN}✓${NC} Unused kernel modules blacklisted"
+echo -e "  ${GREEN}✓${NC} Process accounting (acct + sysstat) active"
 echo -e "  ${GREEN}✓${NC} Lynis: hardening index ${BOLD}$SCORE${NC}"
 echo ""
-echo -e "  ${YELLOW}Root SSH is now disabled.${NC} Log in as: ${BOLD}ssh $NEW_USER@$SERVER_IP${NC}"
+echo -e "  ${YELLOW}Root SSH is disabled.${NC} Log in as: ${BOLD}ssh $NEW_USER@$SERVER_IP${NC}"
 echo -e "  ${YELLOW}Lynis report:${NC} /var/log/lynis.log"
+echo -e "  ${DIM}This script is idempotent — re-run anytime to refresh.${NC}"
 echo ""
