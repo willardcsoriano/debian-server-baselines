@@ -38,6 +38,7 @@ Most hardening scripts lock your server and disappear. This one installs the too
 | Process accounting | `acct` + `sysstat` for command and resource history |
 | Lynis | Security audit — scores your server, flags what to fix next |
 | Operator tooling | Installs `git`, `tmux`, `jq` — not present on Debian minimal, needed to operate the box |
+| Docker | Optional — prompted at start; installs rootless Docker CE (system daemon disabled, user daemon under the sudo account) |
 
 ## Requirements
 

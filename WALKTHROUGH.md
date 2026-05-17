@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is the section-by-section explainer for `baseline.sh` — what each of the 19 numbered sections actually does to a Debian 13 box, which files it writes, which services it starts, the attack it's defending against, and the command you can run afterward to verify it took effect. It complements `README.md` (the one-glance feature table) and is the right place to look when something on your hardened server surprises you or when you want to understand a step before re-running. Sections are linear (1 → 19), preceded by a pre-flight check description, and followed by reference material: a paths cheatsheet, day-to-day usage commands, the re-run preservation contract, deliberate gaps the script does not try to close, troubleshooting, and a note on why this script is server-flavored and would hurt a desktop. Skim the "At a glance" block below if 60 seconds is all you have.
+This is the section-by-section explainer for `baseline.sh` — what each of the 20 numbered sections actually does to a Debian 13 box, which files it writes, which services it starts, the attack it's defending against, and the command you can run afterward to verify it took effect. It complements `README.md` (the one-glance feature table) and is the right place to look when something on your hardened server surprises you or when you want to understand a step before re-running. Sections are linear (1 → 20), preceded by a pre-flight check description, and followed by reference material: a paths cheatsheet, day-to-day usage commands, the re-run preservation contract, deliberate gaps the script does not try to close, troubleshooting, and a note on why this script is server-flavored and would hurt a desktop. Skim the "At a glance" block below if 60 seconds is all you have.
 
 ## Table of Contents
 
@@ -10,30 +10,31 @@ This is the section-by-section explainer for `baseline.sh` — what each of the 
 - [At a glance](#at-a-glance)
 - [Threat model](#threat-model)
 - [Pre-flight (before any section runs)](#pre-flight-before-any-section-runs)
-- [1/19 — System updates](#119-system-updates)
-- [2/19 — Automatic security updates](#219-automatic-security-updates)
-- [3/19 — Sudo user](#319-sudo-user)
-- [4/19 — SSH key copy](#419-ssh-key-copy)
-- [5/19 — SSH safety check (first run only)](#519-ssh-safety-check-first-run-only)
-- [6/19 — SSH hardening](#619-ssh-hardening)
-- [7/19 — Firewall (UFW)](#719-firewall-ufw)
-- [8/19 — fail2ban (brute-force protection)](#819-fail2ban-brute-force-protection)
-- [9/19 — Kernel hardening (sysctl)](#919-kernel-hardening-sysctl)
-- [10/19 — AppArmor](#1019-apparmor)
-- [11/19 — Monitoring (Cockpit + Netdata)](#1119-monitoring-cockpit-netdata)
-- [12/19 — Intrusion detection (rkhunter + auditd + AIDE)](#1219-intrusion-detection-rkhunter-auditd-aide)
+- [1/20 — System updates](#120-system-updates)
+- [2/20 — Automatic security updates](#220-automatic-security-updates)
+- [3/20 — Sudo user](#320-sudo-user)
+- [4/20 — SSH key copy](#420-ssh-key-copy)
+- [5/20 — SSH safety check (first run only)](#520-ssh-safety-check-first-run-only)
+- [6/20 — SSH hardening](#620-ssh-hardening)
+- [7/20 — Firewall (UFW)](#720-firewall-ufw)
+- [8/20 — fail2ban (brute-force protection)](#820-fail2ban-brute-force-protection)
+- [9/20 — Kernel hardening (sysctl)](#920-kernel-hardening-sysctl)
+- [10/20 — AppArmor](#1020-apparmor)
+- [11/20 — Monitoring (Cockpit + Netdata)](#1120-monitoring-cockpit-netdata)
+- [12/20 — Intrusion detection (rkhunter + auditd + AIDE)](#1220-intrusion-detection-rkhunter-auditd-aide)
   - [rkhunter](#rkhunter)
   - [AIDE (Advanced Intrusion Detection Environment)](#aide-advanced-intrusion-detection-environment)
   - [auditd](#auditd)
-- [13/19 — Legal banners](#1319-legal-banners)
-- [14/19 — Password policy (login.defs)](#1419-password-policy-logindefs)
-- [15/19 — Debian goodies + PAM strength](#1519-debian-goodies-pam-strength)
-- [16/19 — Disable unused kernel modules + restrict compilers](#1619-disable-unused-kernel-modules-restrict-compilers)
+- [13/20 — Legal banners](#1320-legal-banners)
+- [14/20 — Password policy (login.defs)](#1420-password-policy-logindefs)
+- [15/20 — Debian goodies + PAM strength](#1520-debian-goodies-pam-strength)
+- [16/20 — Disable unused kernel modules + restrict compilers](#1620-disable-unused-kernel-modules-restrict-compilers)
   - [Kernel module blacklist](#kernel-module-blacklist)
   - [Compiler restriction](#compiler-restriction)
-- [17/19 — Process accounting (acct + sysstat)](#1719-process-accounting-acct-sysstat)
-- [18/19 — Security audit (Lynis)](#1819-security-audit-lynis)
-- [19/19 — Operator tooling](#1919-operator-tooling)
+- [17/20 — Process accounting (acct + sysstat)](#1720-process-accounting-acct-sysstat)
+- [18/20 — Security audit (Lynis)](#1820-security-audit-lynis)
+- [19/20 — Operator tooling](#1920-operator-tooling)
+- [20/20 — Docker rootless (optional)](#2020-docker-rootless-optional)
 - [Where things live (paths cheatsheet)](#where-things-live-paths-cheatsheet)
 - [How to use the box after the script runs](#how-to-use-the-box-after-the-script-runs)
 - [What re-running the script does (and doesn't)](#what-re-running-the-script-does-and-doesnt)
@@ -48,36 +49,36 @@ If you only have 60 seconds, here's what changes about your box after `baseline.
 
 **Login surface**
 
-- SSH: root login off, password-based SSH off (key-only auth), brute-force protection via [fail2ban](#819--fail2ban-brute-force-protection)
-- New non-root user with sudo — [requires a password you set during the run](#319--sudo-user) (so a leaked SSH key alone can't escalate to root)
-- [Password aging](#1419--password-policy-logindefs) (90-day expiry) and complexity rules via PAM
+- SSH: root login off, password-based SSH off (key-only auth), brute-force protection via [fail2ban](#820--fail2ban-brute-force-protection)
+- New non-root user with sudo — [requires a password you set during the run](#320--sudo-user) (so a leaked SSH key alone can't escalate to root)
+- [Password aging](#1420--password-policy-logindefs) (90-day expiry) and complexity rules via PAM
 
 **Network**
 
-- [UFW firewall](#719--firewall-ufw): only TCP 22 / 80 / 443 reachable; everything else dropped
-- [Kernel network stack](#919--kernel-hardening-sysctl) hardened against SYN floods, source spoofing, ICMP redirects
-- [Rare protocols (DCCP/SCTP/RDS/TIPC) and USB/firewire storage drivers blacklisted](#1619--disable-unused-kernel-modules--restrict-compilers)
+- [UFW firewall](#720--firewall-ufw): only TCP 22 / 80 / 443 reachable; everything else dropped
+- [Kernel network stack](#920--kernel-hardening-sysctl) hardened against SYN floods, source spoofing, ICMP redirects
+- [Rare protocols (DCCP/SCTP/RDS/TIPC) and USB/firewire storage drivers blacklisted](#1620--disable-unused-kernel-modules--restrict-compilers)
 
 **Monitoring & forensics**
 
-- [Cockpit + Netdata](#1119--monitoring-cockpit--netdata) installed, reachable only via SSH tunnel — never exposed publicly
-- [auditd](#1219--intrusion-detection-rkhunter--auditd--aide) logs identity changes, SSH config edits, audit tampering, login records, time changes, module loads
-- [AIDE](#1219--intrusion-detection-rkhunter--auditd--aide) maintains a filesystem-integrity baseline so you can detect drift
-- [rkhunter](#1219--intrusion-detection-rkhunter--auditd--aide) scans for known rootkit signatures
-- [debsums](#1519--debian-goodies--pam-strength) daily-cron verifies package files match their manifests
-- [Lynis](#1819--security-audit-lynis) audits the whole box and gives you a 0–100 score
+- [Cockpit + Netdata](#1120--monitoring-cockpit--netdata) installed, reachable only via SSH tunnel — never exposed publicly
+- [auditd](#1220--intrusion-detection-rkhunter--auditd--aide) logs identity changes, SSH config edits, audit tampering, login records, time changes, module loads
+- [AIDE](#1220--intrusion-detection-rkhunter--auditd--aide) maintains a filesystem-integrity baseline so you can detect drift
+- [rkhunter](#1220--intrusion-detection-rkhunter--auditd--aide) scans for known rootkit signatures
+- [debsums](#1520--debian-goodies--pam-strength) daily-cron verifies package files match their manifests
+- [Lynis](#1820--security-audit-lynis) audits the whole box and gives you a 0–100 score
 
 **Defense in depth**
 
-- [AppArmor](#1019--apparmor) profiles in enforce mode (mandatory access control)
-- [Compilers (gcc/g++/cc/as) locked to root](#1619--disable-unused-kernel-modules--restrict-compilers) — blocks the build-local-exploit step of most privesc chains
-- [Automatic security updates](#219--automatic-security-updates) via `unattended-upgrades`
+- [AppArmor](#1020--apparmor) profiles in enforce mode (mandatory access control)
+- [Compilers (gcc/g++/cc/as) locked to root](#1620--disable-unused-kernel-modules--restrict-compilers) — blocks the build-local-exploit step of most privesc chains
+- [Automatic security updates](#220--automatic-security-updates) via `unattended-upgrades`
 
 **Day-to-day usage**
 
 - Log in: `ssh <user>@<server-ip>` with your key, then `sudo` with the password you set
 - Read logs: `journalctl -f`, `sudo ausearch -k identity`, `sudo fail2ban-client status sshd`
-- Web UIs (Cockpit, Netdata): via SSH tunnel (commands in [section 11](#1119--monitoring-cockpit--netdata))
+- Web UIs (Cockpit, Netdata): via SSH tunnel (commands in [section 11](#1120--monitoring-cockpit--netdata))
 - Re-run anytime — the script is idempotent and preserves your customizations
 
 **Not appropriate for**
@@ -119,7 +120,7 @@ Then it asks for the sudo username — pre-filled from the existing sudo group o
 
 ---
 
-## 1/19 — System updates
+## 1/20 — System updates
 
 **What it does:** Runs `apt-get update` then `apt-get upgrade -y` to bring every installed package to its current version.
 
@@ -131,7 +132,7 @@ Then it asks for the sudo username — pre-filled from the existing sudo group o
 
 ---
 
-## 2/19 — Automatic security updates
+## 2/20 — Automatic security updates
 
 **What it does:** Installs `unattended-upgrades` and enables its systemd timer. From now on, security patches install themselves automatically.
 
@@ -146,7 +147,7 @@ Then it asks for the sudo username — pre-filled from the existing sudo group o
 
 ---
 
-## 3/19 — Sudo user
+## 3/20 — Sudo user
 
 **What it does:** Creates a non-root user (or finds the existing one), adds them to the `sudo` group, prompts for a sudo password if they don't have one, and writes a sudoers drop-in.
 
@@ -165,7 +166,7 @@ Then it asks for the sudo username — pre-filled from the existing sudo group o
 
 ---
 
-## 4/19 — SSH key copy
+## 4/20 — SSH key copy
 
 **What it does:** Copies `/root/.ssh/authorized_keys` to `/home/<user>/.ssh/authorized_keys` so the new user can SSH in with the same key root has been using.
 
@@ -183,7 +184,7 @@ ssh-keygen -l -f /home/<user>/.ssh/authorized_keys   # show key fingerprint
 
 ---
 
-## 5/19 — SSH safety check (first run only)
+## 5/20 — SSH safety check (first run only)
 
 **What it does:** Pauses and tells you to open a *second terminal* and SSH in as the new user before letting the script disable root SSH. You type `yes` to confirm.
 
@@ -193,7 +194,7 @@ ssh-keygen -l -f /home/<user>/.ssh/authorized_keys   # show key fingerprint
 
 ---
 
-## 6/19 — SSH hardening
+## 6/20 — SSH hardening
 
 **What it does:** Edits `/etc/ssh/sshd_config` to disable root login, password auth, and a bunch of forwarding features. Backs up the original first, validates the new config with `sshd -t`, then reloads `sshd`.
 
@@ -226,7 +227,7 @@ sudo sshd -T | grep -iE 'permitroot|passwordauth|pubkeyauth|maxauthtries'
 
 ---
 
-## 7/19 — Firewall (UFW)
+## 7/20 — Firewall (UFW)
 
 **What it does:** Installs and enables UFW (Uncomplicated Firewall — a friendly wrapper over iptables/nftables). Default: deny all incoming. Allow only TCP 22 (SSH), 80 (HTTP), 443 (HTTPS).
 
@@ -247,7 +248,7 @@ sudo iptables -L INPUT -n -v   # raw rules
 
 ---
 
-## 8/19 — fail2ban (brute-force protection)
+## 8/20 — fail2ban (brute-force protection)
 
 **What it does:** Installs fail2ban, writes a baseline jail config, and starts it. fail2ban watches `auth.log`; if an IP fails SSH 5 times in 10 minutes, it gets banned for 1 hour via the firewall.
 
@@ -267,7 +268,7 @@ sudo journalctl -u fail2ban -f       # live log of bans
 
 ---
 
-## 9/19 — Kernel hardening (sysctl)
+## 9/20 — Kernel hardening (sysctl)
 
 **What it does:** Writes a kernel-parameters file to `/etc/sysctl.d/99-hardening.conf` and applies it. These are runtime kernel switches that change how the network stack and process memory behave.
 
@@ -296,7 +297,7 @@ sysctl net.ipv4.tcp_syncookies kernel.kptr_restrict kernel.dmesg_restrict
 
 ---
 
-## 10/19 — AppArmor
+## 10/20 — AppArmor
 
 **What it does:** Installs AppArmor (Linux's mandatory access control system) and ensures profiles in `/etc/apparmor.d/` are loaded in *enforce* mode.
 
@@ -315,7 +316,7 @@ You should see profiles listed under "enforce mode." Six is typical on a fresh D
 
 ---
 
-## 11/19 — Monitoring (Cockpit + Netdata)
+## 11/20 — Monitoring (Cockpit + Netdata)
 
 **What it does:** Installs two web-based monitoring tools, but doesn't open their ports in the firewall — you reach them over SSH tunnels only.
 
@@ -343,7 +344,7 @@ ssh -N -L 19999:localhost:19999 <user>@<server-ip>
 
 ---
 
-## 12/19 — Intrusion detection (rkhunter + auditd + AIDE)
+## 12/20 — Intrusion detection (rkhunter + auditd + AIDE)
 
 Three different tools, three different jobs:
 
@@ -397,7 +398,7 @@ sudo aureport --summary          # high-level overview
 
 ---
 
-## 13/19 — Legal banners
+## 13/20 — Legal banners
 
 **What it does:** Writes warning text to `/etc/issue` (shown at local console login) and `/etc/issue.net` (shown at SSH login, before auth).
 
@@ -409,7 +410,7 @@ sudo aureport --summary          # high-level overview
 
 ---
 
-## 14/19 — Password policy (login.defs)
+## 14/20 — Password policy (login.defs)
 
 **What it does:** Sets password aging defaults in `/etc/login.defs` and applies them to existing sudo users via `chage`.
 
@@ -438,7 +439,7 @@ sudo chage -l <username>     # shows aging info per user
 
 ---
 
-## 15/19 — Debian goodies + PAM strength
+## 15/20 — Debian goodies + PAM strength
 
 **What it does:** Installs a bundle of small Debian-native packages that improve security or visibility:
 
@@ -462,7 +463,7 @@ cat /etc/needrestart/conf.d/50-autorestart.conf
 
 ---
 
-## 16/19 — Disable unused kernel modules + restrict compilers
+## 16/20 — Disable unused kernel modules + restrict compilers
 
 **What it does:** Two unrelated hardening steps:
 
@@ -488,7 +489,7 @@ lsmod | grep -E 'usb_storage|firewire'   # should be empty after reboot
 
 ---
 
-## 17/19 — Process accounting (acct + sysstat)
+## 17/20 — Process accounting (acct + sysstat)
 
 **What it does:**
 - **acct**: logs every process that ran, with user, command, runtime, and exit status. Queryable later with `lastcomm` and `sa`.
@@ -512,7 +513,7 @@ sar -u 1 5      # live CPU stats
 
 ---
 
-## 18/19 — Security audit (Lynis)
+## 18/20 — Security audit (Lynis)
 
 **What it does:** Installs Lynis (from CISOfy's apt repo, not Debian's stale package), runs a full audit, saves the report.
 
@@ -532,7 +533,7 @@ sudo lynis show details <TEST-ID>    # explain a specific finding
 
 ---
 
-## 19/19 — Operator tooling
+## 19/20 — Operator tooling
 
 **What it does:** Installs the minimal set of operator tools not present on a fresh Debian 13 minimal install: `git`, `tmux`, and `jq`.
 
@@ -544,6 +545,34 @@ sudo lynis show details <TEST-ID>    # explain a specific finding
 **Verify:**
 ```bash
 git --version && tmux -V && jq --version
+```
+
+---
+
+## 20/20 — Docker rootless (optional)
+
+**What it does:** Prompts during preflight whether to install Docker. If yes, adds Docker's official apt repo (deb822 format), installs the full Docker CE stack plus `docker-ce-rootless-extras` and `uidmap`, then **disables the system-mode daemon** and sets up a rootless daemon under the sudo user's account. The user daemon is enabled via `systemctl --user enable --now docker`, `loginctl enable-linger` keeps it alive after logout, and `DOCKER_HOST` is appended to `~/.bashrc`. Skipped silently if the user answers no. On re-run, auto-detected via the sources file or the user's Docker socket.
+
+**The login gate:** Rootless Docker can only be bootstrapped against a live user session — root can't fake one. Before doing any setup, this section checks for `/run/user/<uid>/bus` (the DBus session socket, present when the user has an active login OR linger is already on from a previous run). If neither is true, the script pauses and tells you to open a second terminal and `ssh $NEW_USER@$SERVER_IP`. You leave that session open, press Enter back in the script terminal, and setup continues. This is the only place in the script that can't run unattended on a fresh box — and it only fires if you said yes to Docker.
+
+**Why rootless:** The system-mode daemon runs as root — a container escape or daemon exploit owns the box. In rootless mode the daemon runs as an unprivileged user; a worst-case compromise is limited to that user's context. The one-time setup cost is worth the permanent reduction in blast radius.
+
+**Why optional:** Not every box runs containers. Opting in is one keypress; opting out costs nothing.
+
+**Files/state changed (when installed):**
+- GPG key: `/etc/apt/keyrings/docker.asc`
+- Apt source: `/etc/apt/sources.list.d/docker.sources`
+- Packages: `docker-ce`, `docker-ce-cli`, `containerd.io`, `docker-buildx-plugin`, `docker-compose-plugin`, `docker-ce-rootless-extras`, `uidmap`
+- System daemon: `docker.service` and `docker.socket` disabled
+- User daemon: rootless daemon installed under `$NEW_USER`, enabled and lingered
+- Shell: `DOCKER_HOST` and `PATH` appended to `~/.bashrc`
+
+**Verify:**
+```bash
+# as the sudo user (new shell or after sourcing .bashrc)
+docker info   # Context should show: rootless
+docker compose version
+systemctl --user status docker
 ```
 
 ---
