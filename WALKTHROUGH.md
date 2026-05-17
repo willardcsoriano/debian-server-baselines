@@ -8,6 +8,7 @@ This is the section-by-section explainer for `baseline.sh` — what each of the 
 
 - [Overview](#overview)
 - [At a glance](#at-a-glance)
+- [Threat model](#threat-model)
 - [Pre-flight (before any section runs)](#pre-flight-before-any-section-runs)
 - [1/18 — System updates](#118-system-updates)
 - [2/18 — Automatic security updates](#218-automatic-security-updates)
@@ -38,6 +39,7 @@ This is the section-by-section explainer for `baseline.sh` — what each of the 
 - [Deliberate gaps (what this script does NOT do)](#deliberate-gaps-what-this-script-does-not-do)
 - [Troubleshooting](#troubleshooting)
 - [A note on running this on a desktop (not a server)](#a-note-on-running-this-on-a-desktop-not-a-server)
+- [Why this script instead of a third-party hardening tool](#why-this-script-instead-of-a-third-party-hardening-tool)
 
 ## At a glance
 
@@ -82,6 +84,21 @@ If you only have 60 seconds, here's what changes about your box after `baseline.
 - Desktops or laptops — [see why](#a-note-on-running-this-on-a-desktop-not-a-server)
 - Anything pre-Debian 13
 - A box without an SSH public key in `/root/.ssh/authorized_keys` before you start (the script refuses to run)
+
+---
+
+## Threat model
+
+What attacks this script defends against and how:
+
+| Threat | Vector | Defense |
+|---|---|---|
+| Brute-force login | SSH password auth | Disable passwords; key-only auth + fail2ban |
+| Automated scanners | Open ports | UFW firewall; only 22/80/443 exposed |
+| Known vulnerability exploits | Unpatched software | Automatic security updates |
+| Privilege escalation | Root account exposure | Disable root SSH; sudo requires a password |
+| Rootkits / backdoors | Compromised packages | rkhunter; AppArmor; AIDE |
+| Lateral movement after breach | Overpermissioned services | Least-privilege service accounts; compiler restriction |
 
 ---
 
@@ -624,3 +641,23 @@ This script is written for *servers* — headless, single-purpose, network-expos
 - **Section 14 password aging** — your password expires every 90 days.
 
 Running it unmodified on a desktop is a bad time. If you want a desktop-flavored hardening pass, you'd want to (at minimum) skip sections 7, 16's USB blacklist, 16's compiler restriction, and possibly relax section 14.
+
+---
+
+## Why this script instead of a third-party hardening tool
+
+Third-party hardening scripts (`vps-harden`, `du_setup`, and similar) have well-known problems:
+
+- No record of what was changed or why.
+- Settings drift over time with no ongoing enforcement.
+- Updates to the script don't propagate to already-provisioned servers.
+- Opinionated in ways that conflict with specific workloads.
+
+`debian-baseline` addresses each:
+
+- **Transparent.** It's a single Bash script in a repo you own (or read in full); every change shows up in `git log`.
+- **Idempotent.** Re-runnable any time. Re-runs pick up new sections and refresh policy — there's no "script ran last year and the box has since drifted" failure mode.
+- **Versioned.** Updates propagate by re-running the same `curl | sudo bash` line.
+- **Tuned for one use case.** Built for a single-host Docker VPS with Cockpit/Netdata/Lynis for ongoing visibility, not as a one-size-fits-all tool.
+
+The argument against generic hardening scripts is correct. The fix isn't manual setup — it's a script you own, maintain, and re-run.
