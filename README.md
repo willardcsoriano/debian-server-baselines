@@ -16,6 +16,8 @@ Works whether you're root (omit `sudo`) or a sudo user. Takes ~5 minutes.
 
 Most hardening scripts lock your server and disappear. This one installs the tools to keep it hardened — so you have ongoing visibility, not just a one-time configuration.
 
+> Want a section-by-section walkthrough with verification commands and threat-model notes? See [WALKTHROUGH.md](WALKTHROUGH.md).
+
 | Step | What |
 |---|---|
 | System updates | Upgrades all installed packages to current versions |
@@ -36,6 +38,7 @@ Most hardening scripts lock your server and disappear. This one installs the too
 | Password policy | Aging, umask 027, SHA512 hash rounds via `/etc/login.defs` |
 | Debian goodies | `libpam-tmpdir`, `libpam-passwdqc`, `apt-listbugs/changes`, `needrestart`, `debsums`, `apt-show-versions` |
 | Kernel modules | Blacklists rare protocols (dccp/sctp/rds/tipc) and USB/Firewire storage |
+| Compiler restriction | `gcc`, `g++`, `cc`, `as` (and versioned variants) set to mode 750 — root-only, defeats local-privesc exploit building |
 | Process accounting | `acct` + `sysstat` for command and resource history |
 | Lynis | Security audit — scores your server, flags what to fix next |
 
@@ -57,7 +60,8 @@ The script detects prior runs and adapts:
 
 - Pre-fills sudo username from the existing sudo group
 - Skips the SSH safety pause once root login is already disabled
-- Preserves existing `authorized_keys`, UFW rules, rkhunter baseline, and Lynis baseline log
+- Preserves existing `authorized_keys`, UFW rules, rkhunter baseline, AIDE database, custom legal banners, `jail.local`, and Lynis baseline log
+- Detects existing sudo password (`passwd -S`) and skips the prompt if one is already set
 - Adds new UFW rules instead of resetting; merges `sshd_config` keys in place
 - Re-runs Lynis to track hardening index improvement over time
 
