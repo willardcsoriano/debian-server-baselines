@@ -572,6 +572,7 @@ if [[ $INSTALL_DOCKER -eq 1 ]]; then
     echo ""
     echo -e "  Open a new terminal and run:"
     echo -e "  ${BOLD}    ssh $NEW_USER@$SERVER_IP${NC}"
+    echo -e "  ${DIM}  (if you use an SSH alias or -i flag, use that instead of the raw IP)${NC}"
     echo ""
     echo -e "  Keep that session open, then press ${BOLD}Enter${NC} here to continue..."
     read -r </dev/tty
