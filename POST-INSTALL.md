@@ -9,6 +9,9 @@ This document covers what to do **after** `baseline.sh` finishes — things you'
 - [Overview](#overview)
 - [Compatibility](#compatibility)
   - [VS Code Remote-SSH (and other `-L` / `-D` tunneling tools)](#vs-code-remote-ssh-and-other--l--d-tunneling-tools)
+- [Installing additional services](#installing-additional-services)
+  - [Docker on a hardened host](#docker-on-a-hardened-host)
+    - [Living with the script's hardening](#living-with-the-scripts-hardening)
 
 ## Compatibility
 
@@ -31,3 +34,71 @@ sudo sshd -t && sudo systemctl reload ssh
 ```
 
 The drop-in survives re-runs because the script edits `/etc/ssh/sshd_config` directly, not the `.d/` directory. OpenSSH evaluates the first matching directive, so `local` from the drop-in wins over `no` in the main file.
+
+## Installing additional services
+
+### Docker on a hardened host
+
+Docker isn't auto-installed by anything (not even VS Code's Remote-SSH magic — that only installs `vscode-server`, not a container runtime). The daemon is a system service and has to live on whichever machine runs the containers. If your laptop is small and you want the VPS to be your dev environment, Docker has to go on the VPS.
+
+The script doesn't touch Docker so the install is a clean addition. Use Docker's official apt repo, not Debian's `docker.io` package — the official repo tracks current releases; the distro package lags.
+
+**1. Remove any distro-shipped Docker packages first** (no-op on a fresh install, but cheap to run):
+
+```bash
+sudo apt remove $(dpkg --get-selections docker.io docker-compose docker-doc podman-docker containerd runc | cut -f1)
+```
+
+**2. Add Docker's apt repo** (deb822 `.sources` format with an ASCII-armored key — this is the current Docker-recommended layout, not the older `.list` + binary `.gpg` style):
+
+```bash
+sudo apt update
+sudo apt install ca-certificates curl
+sudo install -m 0755 -d /etc/apt/keyrings
+sudo curl -fsSL https://download.docker.com/linux/debian/gpg -o /etc/apt/keyrings/docker.asc
+sudo chmod a+r /etc/apt/keyrings/docker.asc
+
+sudo tee /etc/apt/sources.list.d/docker.sources <<EOF
+Types: deb
+URIs: https://download.docker.com/linux/debian
+Suites: $(. /etc/os-release && echo "$VERSION_CODENAME")
+Components: stable
+Architectures: $(dpkg --print-architecture)
+Signed-By: /etc/apt/keyrings/docker.asc
+EOF
+
+sudo apt update
+```
+
+**3. Install Docker Engine, CLI, containerd, and the buildx/compose plugins:**
+
+```bash
+sudo apt install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+```
+
+The Debian package enables and starts the `docker` service via its postinst hook, so no separate `systemctl enable --now docker` is needed. Verify with:
+
+```bash
+sudo docker run hello-world
+```
+
+**4. (Optional) Run Docker without `sudo`** — add your user to the `docker` group, then log out and back in:
+
+```bash
+sudo usermod -aG docker $USER
+exit
+# SSH back in, then:
+docker run hello-world
+```
+
+Heads up: being in the `docker` group is **effectively root**, because a container with `-v /:/host` can read or modify anything on the host. For a solo dev on your own box this is the standard tradeoff; just know it weakens the "sudo requires a password" defense the script set up.
+
+#### Living with the script's hardening
+
+Three habits worth forming, all driven by what `baseline.sh` already configured:
+
+- **Bind container ports to loopback.** Docker writes its own iptables rules below UFW, so `-p 8080:80` exposes a container to the public internet even though UFW only allows 22/80/443. Get in the habit of `-p 127.0.0.1:8080:80` and then tunnel from your laptop with `ssh -L 8080:localhost:8080 ...` (or VS Code's Forwarded Ports panel). Same pattern the script already uses for Cockpit and Netdata.
+- **Build inside containers, not on the host shell.** Section 16 of the script sets `gcc`, `g++`, `cc`, and `as` to mode 750 — root-only — so a host-side `npm install` or `pip install` with native dependencies will fail for your sudo user. Inside a container the toolchain is unrestricted, so the rule of thumb "always build in a container" makes the restriction invisible.
+- **Expect AIDE and rkhunter noise around `/var/lib/docker`.** Both scanners will report constant changes under Docker's data directory because images and containers churn there. Either tune those tools to ignore `/var/lib/docker` and `/var/lib/containerd`, or learn to skim past container-related diffs when reviewing reports.
+
+That's the whole post-install for Docker: one apt sequence, one optional group add, three habits.
