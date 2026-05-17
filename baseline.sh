@@ -38,12 +38,13 @@ fi
 # ─── Username ─────────────────────────────────────────────────────────────────
 
 echo ""
+[[ -t 0 || -r /dev/tty ]] || fail "No tty available — this script requires interactive input. Use 'curl ... | sudo bash' from a terminal, not from a non-interactive context."
 EXISTING_SUDO=$(getent group sudo | cut -d: -f4 | tr ',' '\n' | grep -v '^$' | grep -v '^root$' | head -1)
 if [[ -n "$EXISTING_SUDO" ]]; then
-  read -rp "  Sudo username [$EXISTING_SUDO]: " NEW_USER
+  read -rp "  Sudo username [$EXISTING_SUDO]: " NEW_USER </dev/tty
   NEW_USER="${NEW_USER:-$EXISTING_SUDO}"
 else
-  read -rp "  Sudo username to create: " NEW_USER
+  read -rp "  Sudo username to create: " NEW_USER </dev/tty
 fi
 echo ""
 
@@ -130,7 +131,7 @@ else
   echo -e "  Open a new terminal and run:"
   echo -e "  ${BOLD}    ssh $NEW_USER@$SERVER_IP${NC}"
   echo ""
-  read -rp "  Type 'yes' to confirm login worked: " CONFIRMED
+  read -rp "  Type 'yes' to confirm login worked: " CONFIRMED </dev/tty
   [[ "$CONFIRMED" != "yes" ]] && fail "Aborted. Resolve SSH access before continuing."
   pass "SSH access confirmed"
 fi

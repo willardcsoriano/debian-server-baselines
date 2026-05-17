@@ -3,10 +3,12 @@
 One command to harden a fresh Debian 13 server.
 
 ```bash
-bash <(curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-baseline/main/baseline.sh)
+curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-baseline/main/baseline.sh | sudo bash
 ```
 
-Run as root. Takes ~5 minutes.
+Works whether you're root (omit `sudo`) or a sudo user. Takes ~5 minutes.
+
+> **Why `curl | sudo bash` and not `sudo bash <(curl ...)`?** Process substitution passes the script via `/dev/fd/N`, which `sudo` closes when invoking the new process — the inner `bash` then fails with `/dev/fd/63: No such file or directory`. The pipe form survives the sudo exec cleanly. The script reads interactive prompts from `/dev/tty`, so stdin being the pipe is not a problem.
 
 ---
 
