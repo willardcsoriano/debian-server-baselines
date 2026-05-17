@@ -384,12 +384,15 @@ DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
   libpam-tmpdir libpam-passwdqc apt-listbugs apt-listchanges \
   needrestart debsums apt-show-versions
 # PKGS-7370: enable debsums daily cron so package integrity is verified
-# on a schedule, not just on demand.
+# on a schedule, not just on demand. Value is intentionally unquoted —
+# Lynis's PKGS-7370 test splits on '=' and string-compares the result
+# to 'daily', so CRON_CHECK="daily" matches as "daily" (with quotes)
+# and the check fails. Both forms are valid shell.
 if [[ -f /etc/default/debsums ]]; then
   if grep -qE '^#?\s*CRON_CHECK=' /etc/default/debsums; then
-    sed -i -E 's|^#?\s*CRON_CHECK=.*|CRON_CHECK="daily"|' /etc/default/debsums
+    sed -i -E 's|^#?\s*CRON_CHECK=.*|CRON_CHECK=daily|' /etc/default/debsums
   else
-    echo 'CRON_CHECK="daily"' >> /etc/default/debsums
+    echo 'CRON_CHECK=daily' >> /etc/default/debsums
   fi
 fi
 pass "libpam-tmpdir, libpam-passwdqc, apt safety nets installed (debsums cron: daily)"
