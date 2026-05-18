@@ -617,6 +617,18 @@ EOF
   # Disable the system-mode daemon — rootless replaces it
   systemctl disable --now docker.service docker.socket 2>/dev/null || true
 
+  # Rootless Docker requires /etc/subuid and /etc/subgid entries (65536 UIDs).
+  # adduser creates these automatically, but pre-existing users (e.g. from a
+  # VPS image) may be missing them. Ensure they exist before running setup.
+  if ! grep -q "^$NEW_USER:" /etc/subuid 2>/dev/null; then
+    usermod --add-subuids 100000-165535 "$NEW_USER"
+    note "Added subuid range for $NEW_USER"
+  fi
+  if ! grep -q "^$NEW_USER:" /etc/subgid 2>/dev/null; then
+    usermod --add-subgids 100000-165535 "$NEW_USER"
+    note "Added subgid range for $NEW_USER"
+  fi
+
   # Set up rootless daemon as $NEW_USER if not already configured.
   # Check for the systemd user service, not just the binary — the binary
   # gets created even when setup runs without systemd (missing XDG_RUNTIME_DIR),
