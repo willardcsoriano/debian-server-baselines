@@ -21,6 +21,7 @@ echo ""
 
 [[ $EUID -ne 0 ]]          && fail "Must run as root (or via sudo)."
 [[ -f /etc/os-release ]]   || fail "Cannot detect OS."
+# shellcheck source=/dev/null
 . /etc/os-release
 [[ "$ID" == "debian" ]]    || fail "Debian only. Detected: $ID"
 [[ "$VERSION_ID" -ge 13 ]] || fail "Requires Debian 13+. Detected: $VERSION_ID"
