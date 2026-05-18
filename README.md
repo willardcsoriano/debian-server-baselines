@@ -1,21 +1,18 @@
 # debian-baseline
 
-## Table of Contents
-
-- [Usage](#usage)
-- [What it does](#what-it-does)
-- [Requirements](#requirements)
-- [What happens](#what-happens)
-- [Idempotent — safe to re-run](#idempotent-safe-to-re-run)
-- [After it runs](#after-it-runs)
-
-## Usage
-
 ```bash
 curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-baseline/main/baseline.sh | sudo bash
 ```
 
 Run as root on a fresh Debian 13 server. Re-run anytime — the script is idempotent.
+
+## Table of Contents
+
+- [What it does](#what-it-does)
+- [Requirements](#requirements)
+- [What happens](#what-happens)
+- [Idempotent — safe to re-run](#idempotent-safe-to-re-run)
+- [After it runs](#after-it-runs)
 
 ## What it does
 
