@@ -298,6 +298,19 @@ EOF
 sysctl --system >/dev/null
 pass "Kernel parameters applied"
 
+# /tmp as tmpfs with noexec,nosuid,nodev — prevents execution of files dropped
+# in /tmp, which is the first stage of most local privilege escalation chains.
+if findmnt -n -o FSTYPE /tmp 2>/dev/null | grep -q tmpfs; then
+  pass "/tmp already tmpfs (preserved)"
+elif grep -q '^tmpfs /tmp' /etc/fstab 2>/dev/null; then
+  mount -o remount /tmp
+  pass "/tmp remounted as tmpfs (noexec,nosuid,nodev)"
+else
+  echo "tmpfs /tmp tmpfs defaults,noexec,nosuid,nodev,size=2G 0 0" >> /etc/fstab
+  mount -t tmpfs -o defaults,noexec,nosuid,nodev,size=2G tmpfs /tmp
+  pass "/tmp mounted as tmpfs (noexec,nosuid,nodev)"
+fi
+
 # ─── 10. AppArmor ────────────────────────────────────────────────────────────
 
 section "10/20 AppArmor"
@@ -677,7 +690,7 @@ echo -e "  ${GREEN}✓${NC} Sudo user: ${BOLD}$NEW_USER${NC}"
 echo -e "  ${GREEN}✓${NC} SSH: root off, key-only, restricted forwarding"
 echo -e "  ${GREEN}✓${NC} Firewall: 22, 80, 443 open — all else denied"
 echo -e "  ${GREEN}✓${NC} fail2ban: brute-force protection active"
-echo -e "  ${GREEN}✓${NC} Kernel: network attack surface reduced"
+echo -e "  ${GREEN}✓${NC} Kernel: network attack surface reduced + /tmp noexec"
 echo -e "  ${GREEN}✓${NC} AppArmor: mandatory access control active"
 if [[ ${NETDATA_OK:-1} -eq 1 ]]; then
   echo -e "  ${GREEN}✓${NC} Cockpit + Netdata: installed, tunnel-only access"

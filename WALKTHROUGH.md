@@ -290,9 +290,17 @@ sudo journalctl -u fail2ban -f       # live log of bans
 | `kernel.dmesg_restrict` | `1` | Non-root can't read kernel ring buffer (`dmesg`) — hides driver/init details from attackers. |
 | `kernel.kptr_restrict` | `2` | Kernel pointers in `/proc` show as `0x000…` to non-root — defeats one of the easier kernel exploit primitives. |
 
+Also mounts `/tmp` as `tmpfs` with `noexec,nosuid,nodev` and writes the entry to `/etc/fstab` so it persists across reboots. This prevents execution of files dropped in `/tmp` — the first stage of most local privilege escalation chains. Idempotent: skips if already mounted as tmpfs.
+
+**Files/state changed:**
+- `/etc/sysctl.d/99-hardening.conf` (kernel parameters)
+- `/etc/fstab` (tmpfs entry for /tmp)
+- `/tmp` remounted as tmpfs
+
 **Verify after:**
 ```bash
 sysctl net.ipv4.tcp_syncookies kernel.kptr_restrict kernel.dmesg_restrict
+findmnt /tmp   # should show tmpfs with noexec,nosuid,nodev
 ```
 
 ---
