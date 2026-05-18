@@ -60,13 +60,24 @@ INSTALL_DOCKER=0
 _docker_rootless_sock="/run/user/$(id -u "$NEW_USER" 2>/dev/null || echo 0)/docker.sock"
 if [[ -f /etc/apt/sources.list.d/docker.sources ]] || [[ -S "$_docker_rootless_sock" ]]; then
   INSTALL_DOCKER=1
-  note "Docker detected — section 20 will verify install."
+  note "Docker detected — section 20/21 will verify install."
 else
   read -rp "  Install Docker (rootless)? [y/N]: " _docker_ans </dev/tty
   if [[ "${_docker_ans,,}" == "y" ]]; then
     INSTALL_DOCKER=1
-    note "Heads-up: section 20 will pause and ask you to log in as $NEW_USER once."
+    note "Heads-up: section 20/21 will pause and ask you to log in as $NEW_USER once."
   fi
+fi
+
+# Remote syslog opt-in (auto-detected on re-run via existing config)
+LOG_SERVER=""
+if [[ -f /etc/rsyslog.d/50-remote-syslog.conf ]]; then
+  LOG_SERVER=$(grep -oP '@@\K[^:]+' /etc/rsyslog.d/50-remote-syslog.conf | head -1 || true)
+  note "Remote syslog detected → $LOG_SERVER (section 21/21 will verify)"
+else
+  read -rp "  Remote syslog server IP/hostname (leave blank to skip): " LOG_SERVER </dev/tty
+  LOG_SERVER="${LOG_SERVER// /}"
+  [[ -n "$LOG_SERVER" ]] && note "Logs will forward to $LOG_SERVER:514 via TCP in section 21/21."
 fi
 echo ""
 
@@ -94,21 +105,21 @@ set_login_def() {
 
 # ─── 1. System updates ────────────────────────────────────────────────────────
 
-section "1/20  System updates"
+section "1/21  System updates"
 apt-get update -qq
 DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq
 pass "All packages updated"
 
 # ─── 2. Automatic security updates ───────────────────────────────────────────
 
-section "2/20  Automatic security updates"
+section "2/21  Automatic security updates"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq unattended-upgrades
 systemctl enable --now unattended-upgrades -q
 pass "unattended-upgrades active"
 
 # ─── 3. Sudo user ─────────────────────────────────────────────────────────────
 
-section "3/20  Sudo user ($NEW_USER)"
+section "3/21  Sudo user ($NEW_USER)"
 if id "$NEW_USER" &>/dev/null; then
   warn "User $NEW_USER already exists — skipping creation"
 else
@@ -135,7 +146,7 @@ pass "$NEW_USER in sudo group (password required)"
 
 # ─── 4. Copy SSH key ──────────────────────────────────────────────────────────
 
-section "4/20  SSH key"
+section "4/21  SSH key"
 USER_HOME="/home/$NEW_USER"
 mkdir -p "$USER_HOME/.ssh"
 touch "$USER_HOME/.ssh/authorized_keys"
@@ -163,7 +174,7 @@ chmod 600 "$USER_HOME/.ssh/authorized_keys"
 
 # ─── 5. Safety check ─────────────────────────────────────────────────────────
 
-section "5/20  SSH safety check"
+section "5/21  SSH safety check"
 if [[ $RERUN -eq 1 ]]; then
   pass "SSH already hardened — skipping interactive confirmation"
 else
@@ -180,7 +191,7 @@ fi
 
 # ─── 6. SSH hardening ────────────────────────────────────────────────────────
 
-section "6/20  SSH hardening"
+section "6/21  SSH hardening"
 cp "$SSHD_CONFIG" "$SSHD_CONFIG.bak.$(date +%Y%m%d-%H%M%S)"
 
 set_sshd PermitRootLogin        no
@@ -189,7 +200,7 @@ set_sshd PubkeyAuthentication   yes
 set_sshd MaxAuthTries           3
 set_sshd LoginGraceTime         30
 set_sshd X11Forwarding          no
-set_sshd AllowTcpForwarding     no
+set_sshd AllowTcpForwarding     local
 set_sshd AllowAgentForwarding   no
 set_sshd MaxSessions            2
 set_sshd ClientAliveCountMax    2
@@ -214,7 +225,7 @@ pass "SSH hardened (root off, key-only, restricted forwarding/sessions, AllowUse
 
 # ─── 7. Firewall ──────────────────────────────────────────────────────────────
 
-section "7/20  Firewall (UFW)"
+section "7/21  Firewall (UFW)"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ufw
 ufw default deny incoming  > /dev/null
 ufw default allow outgoing > /dev/null
@@ -226,7 +237,7 @@ pass "UFW enabled — ports 22, 80, 443 open"
 
 # ─── 8. fail2ban ─────────────────────────────────────────────────────────────
 
-section "8/20  Brute-force protection (fail2ban)"
+section "8/21  Brute-force protection (fail2ban)"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq fail2ban
 mkdir -p /etc/fail2ban/jail.d
 cat > /etc/fail2ban/jail.d/00-baseline.conf <<'EOF'
@@ -273,7 +284,7 @@ pass "fail2ban active — 5 failed attempts → 1h ban"
 
 # ─── 9. Kernel hardening ─────────────────────────────────────────────────────
 
-section "9/20  Kernel hardening (sysctl)"
+section "9/21  Kernel hardening (sysctl)"
 cat > /etc/sysctl.d/99-hardening.conf <<'EOF'
 net.ipv4.tcp_syncookies = 1
 net.ipv4.conf.all.rp_filter = 1
@@ -313,7 +324,7 @@ fi
 
 # ─── 10. AppArmor ────────────────────────────────────────────────────────────
 
-section "10/20 AppArmor"
+section "10/21 AppArmor"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq apparmor apparmor-utils
 systemctl enable --now apparmor -q
 ENFORCED=$(aa-status 2>/dev/null | grep "profiles are in enforce mode" | grep -oP '^\d+' || echo "?")
@@ -321,7 +332,7 @@ pass "AppArmor active ($ENFORCED profiles enforcing)"
 
 # ─── 11. Cockpit + Netdata ───────────────────────────────────────────────────
 
-section "11/20 Monitoring (Cockpit + Netdata)"
+section "11/21 Monitoring (Cockpit + Netdata)"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cockpit
 systemctl enable --now cockpit.socket -q
 pass "Cockpit installed"
@@ -341,7 +352,7 @@ note "Access: ssh -N -L 19999:localhost:19999 $NEW_USER@$SERVER_IP → http://lo
 
 # ─── 12. rkhunter + auditd ───────────────────────────────────────────────────
 
-section "12/20 Intrusion detection (rkhunter + auditd + AIDE)"
+section "12/21 Intrusion detection (rkhunter + auditd + AIDE)"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq rkhunter auditd aide
 rkhunter --update --quiet 2>/dev/null || true
 if [[ ! -f /var/lib/rkhunter/db/rkhunter.dat ]]; then
@@ -412,7 +423,7 @@ pass "auditd active (baseline ruleset loaded)"
 
 # ─── 13. Legal banners ───────────────────────────────────────────────────────
 
-section "13/20 Legal banners"
+section "13/21 Legal banners"
 BANNER=$(cat <<'EOF'
 **************************************************************************
 *                                                                        *
@@ -441,7 +452,7 @@ write_banner /etc/issue.net
 
 # ─── 14. Password policy ─────────────────────────────────────────────────────
 
-section "14/20 Password policy (login.defs)"
+section "14/21 Password policy (login.defs)"
 set_login_def PASS_MAX_DAYS         90
 set_login_def PASS_MIN_DAYS         1
 set_login_def PASS_WARN_AGE         7
@@ -461,7 +472,7 @@ pass "Password aging + umask 027 + SHA512 rounds configured (applied to existing
 
 # ─── 15. Debian goodies + PAM strength ───────────────────────────────────────
 
-section "15/20 Debian goodies + PAM strength"
+section "15/21 Debian goodies + PAM strength"
 # Pre-seed needrestart's config so its first invocation (during its own
 # install, and apt installs in sections 17/18) auto-restarts deferred
 # services and stops printing the "Services to be restarted" list.
@@ -491,7 +502,7 @@ pass "libpam-tmpdir, libpam-passwdqc, apt safety nets installed (debsums cron: d
 
 # ─── 16. Disable unused kernel modules ───────────────────────────────────────
 
-section "16/20 Disable unused kernel modules"
+section "16/21 Disable unused kernel modules"
 cat > /etc/modprobe.d/blacklist-rare-network.conf <<'EOF'
 install dccp /bin/true
 install sctp /bin/true
@@ -527,7 +538,7 @@ fi
 
 # ─── 17. Process accounting ──────────────────────────────────────────────────
 
-section "17/20 Process accounting (acct + sysstat)"
+section "17/21 Process accounting (acct + sysstat)"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq acct sysstat
 systemctl enable --now acct.service -q 2>/dev/null || \
   systemctl enable --now psacct.service -q 2>/dev/null || true
@@ -537,7 +548,7 @@ pass "Process accounting (acct + sysstat) active"
 
 # ─── 18. Lynis ───────────────────────────────────────────────────────────────
 
-section "18/20 Security audit (Lynis)"
+section "18/21 Security audit (Lynis)"
 # LYNIS suggestion: Debian's lynis package lags upstream by months. Pin to
 # CISOfy's apt repo so we get the current release and the latest test set.
 # Keys live in /etc/apt/keyrings/ per modern Debian convention; the sources
@@ -566,13 +577,13 @@ pass "Hardening index: $SCORE"
 
 # ─── 19. Operator tooling ────────────────────────────────────────────────────
 
-section "19/20 Operator tooling"
+section "19/21 Operator tooling"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git tmux jq
 pass "git, tmux, jq installed"
 
 # ─── 20. Docker rootless (optional) ─────────────────────────────────────────
 
-section "20/20 Docker (rootless)"
+section "20/21 Docker (rootless)"
 if [[ $INSTALL_DOCKER -eq 1 ]]; then
   # Rootless Docker needs an active user session for $NEW_USER so we can run
   # 'systemctl --user' against it. The DBus session bus socket at
@@ -678,6 +689,38 @@ fi
 # Clean up packages pulled in transitively but no longer needed
 DEBIAN_FRONTEND=noninteractive apt-get autoremove -y -qq
 
+# ─── 21. Remote syslog (optional) ────────────────────────────────────────────
+
+section "21/21 Remote syslog"
+if [[ -n "$LOG_SERVER" ]]; then
+  # Enable auditd syslog plugin so audit events flow through rsyslog
+  cat > /etc/audit/plugins.d/syslog.conf <<'EOF'
+active = yes
+direction = out
+path = builtin_syslog
+type = builtin
+args = LOG_INFO
+format = string
+EOF
+
+  # Forward security-relevant log facilities via TCP (@@) to the log server.
+  # local6 captures auditd events once the syslog plugin above is active.
+  cat > /etc/rsyslog.d/50-remote-syslog.conf <<EOF
+# Managed by debian-baseline — forward security logs to remote syslog server.
+auth,authpriv.*   @@${LOG_SERVER}:514
+kern.warning      @@${LOG_SERVER}:514
+daemon.*          @@${LOG_SERVER}:514
+syslog.*          @@${LOG_SERVER}:514
+local6.*          @@${LOG_SERVER}:514
+EOF
+
+  systemctl restart auditd 2>/dev/null || true
+  systemctl restart rsyslog
+  pass "Security logs forwarding to $LOG_SERVER:514 via TCP"
+else
+  note "Skipped (no log server specified)"
+fi
+
 # ─── Summary ─────────────────────────────────────────────────────────────────
 
 echo ""
@@ -709,6 +752,11 @@ if [[ $INSTALL_DOCKER -eq 1 ]]; then
   echo -e "  ${GREEN}✓${NC} Docker: rootless, system daemon disabled, $NEW_USER daemon enabled"
 else
   echo -e "  ${DIM}–${NC} Docker: skipped"
+fi
+if [[ -n "$LOG_SERVER" ]]; then
+  echo -e "  ${GREEN}✓${NC} Remote syslog: security logs → $LOG_SERVER:514 via TCP"
+else
+  echo -e "  ${DIM}–${NC} Remote syslog: skipped"
 fi
 echo ""
 echo -e "  ${YELLOW}Root SSH is disabled.${NC} Log in as: ${BOLD}ssh $NEW_USER@$SERVER_IP${NC}"
