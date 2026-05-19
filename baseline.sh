@@ -200,8 +200,17 @@ set_sshd LoginGraceTime         30
 set_sshd X11Forwarding          no
 set_sshd AllowTcpForwarding     local
 set_sshd AllowAgentForwarding   no
-set_sshd MaxSessions            2
-set_sshd ClientAliveCountMax    2
+# MaxSessions 10 matches the OpenSSH default and supports IDE-extension
+# workflows (VSCode Remote-SSH, JetBrains Gateway) that open 5–10 multiplexed
+# channels per connection.  MaxAuthTries 3, LoginGraceTime 30, fail2ban, and
+# AllowUsers make the tighter historic value of 2 redundant without adding
+# meaningful protection against any realistic threat.
+set_sshd MaxSessions            10
+# ClientAliveInterval/CountMax keep NAT-traversed tunnels alive (Cockpit,
+# Netdata, port-forwarded services) and drop genuinely dead connections after
+# ~3 minutes (60s × 3) instead of waiting indefinitely.
+set_sshd ClientAliveInterval    60
+set_sshd ClientAliveCountMax    3
 set_sshd LogLevel               VERBOSE
 set_sshd TCPKeepAlive           no
 
