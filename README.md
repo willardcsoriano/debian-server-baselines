@@ -32,8 +32,8 @@ Most hardening scripts lock your server and disappear. This one installs the too
 | fail2ban | Bans IPs after 5 failed SSH attempts (1h ban) |
 | Kernel hardening | sysctl — SYN flood, spoofing, redirect protection |
 | AppArmor | Mandatory access control, enforce mode |
-| Cockpit | Browser-based server management (SSH tunnel access) |
-| Netdata | Real-time CPU, RAM, disk, network, Docker monitoring |
+| Cockpit | Optional — browser-based server management (SSH tunnel access) |
+| Netdata | Optional — real-time CPU, RAM, disk, network monitoring (SSH tunnel access) |
 | rkhunter | Rootkit detection, baseline saved |
 | auditd | Kernel-level audit logging with a baseline ruleset (identity, SSH, time, module loading) |
 | AIDE | File integrity monitoring — database initialized on first run |

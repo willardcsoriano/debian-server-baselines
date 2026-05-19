@@ -55,6 +55,18 @@ echo ""
 [[ ! -f /root/.ssh/authorized_keys ]]          && fail "No SSH key at /root/.ssh/authorized_keys. Cannot proceed safely."
 [[ ! -s /root/.ssh/authorized_keys ]]          && fail "authorized_keys is empty. Add your public key first."
 
+# Monitoring opt-in (auto-detected on re-run via installed packages)
+INSTALL_MONITORING=0
+if dpkg -l cockpit 2>/dev/null | grep -q '^ii' || \
+   [[ -x /opt/netdata/bin/netdata ]] || \
+   systemctl list-unit-files 2>/dev/null | grep -q '^netdata\.service'; then
+  INSTALL_MONITORING=1
+  note "Monitoring detected — section 11/20 will verify install."
+else
+  read -rp "  Install monitoring (Cockpit + Netdata)? [y/N]: " _mon_ans </dev/tty
+  [[ "${_mon_ans,,}" == "y" ]] && INSTALL_MONITORING=1
+fi
+
 # Remote syslog opt-in (auto-detected on re-run via existing config)
 LOG_SERVER=""
 if [[ -f /etc/rsyslog.d/50-remote-syslog.conf ]]; then
@@ -319,22 +331,27 @@ pass "AppArmor active ($ENFORCED profiles enforcing)"
 # ─── 11. Cockpit + Netdata ───────────────────────────────────────────────────
 
 section "11/20 Monitoring (Cockpit + Netdata)"
-DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cockpit
-systemctl enable --now cockpit.socket -q
-pass "Cockpit installed"
-note "Access: ssh -N -L 9090:localhost:9090 $NEW_USER@$SERVER_IP → https://localhost:9090"
+NETDATA_OK=0
+if [[ $INSTALL_MONITORING -eq 1 ]]; then
+  DEBIAN_FRONTEND=noninteractive apt-get install -y -qq cockpit
+  systemctl enable --now cockpit.socket -q
+  pass "Cockpit installed"
+  note "Access: ssh -N -L 9090:localhost:9090 $NEW_USER@$SERVER_IP → https://localhost:9090"
 
-NETDATA_OK=1
-if [[ -x /opt/netdata/bin/netdata ]] || systemctl list-unit-files 2>/dev/null | grep -q '^netdata\.service'; then
-  pass "Netdata already installed (preserved)"
-elif bash <(curl -fsSL https://get.netdata.cloud/kickstart.sh) \
-       --non-interactive --no-updates --disable-telemetry > /dev/null 2>&1; then
-  pass "Netdata installed"
+  NETDATA_OK=1
+  if [[ -x /opt/netdata/bin/netdata ]] || systemctl list-unit-files 2>/dev/null | grep -q '^netdata\.service'; then
+    pass "Netdata already installed (preserved)"
+  elif bash <(curl -fsSL https://get.netdata.cloud/kickstart.sh) \
+         --non-interactive --no-updates --disable-telemetry > /dev/null 2>&1; then
+    pass "Netdata installed"
+  else
+    warn "Netdata install failed — install manually"
+    NETDATA_OK=0
+  fi
+  note "Access: ssh -N -L 19999:localhost:19999 $NEW_USER@$SERVER_IP → http://localhost:19999"
 else
-  warn "Netdata install failed — install manually"
-  NETDATA_OK=0
+  note "Skipped (not requested)"
 fi
-note "Access: ssh -N -L 19999:localhost:19999 $NEW_USER@$SERVER_IP → http://localhost:19999"
 
 # ─── 12. rkhunter + auditd ───────────────────────────────────────────────────
 
@@ -616,11 +633,15 @@ echo -e "  ${GREEN}✓${NC} Firewall: 22, 80, 443 open — all else denied"
 echo -e "  ${GREEN}✓${NC} fail2ban: brute-force protection active"
 echo -e "  ${GREEN}✓${NC} Kernel: network attack surface reduced + /tmp noexec"
 echo -e "  ${GREEN}✓${NC} AppArmor: mandatory access control active"
-if [[ ${NETDATA_OK:-1} -eq 1 ]]; then
-  echo -e "  ${GREEN}✓${NC} Cockpit + Netdata: installed, tunnel-only access"
+if [[ $INSTALL_MONITORING -eq 1 ]]; then
+  if [[ $NETDATA_OK -eq 1 ]]; then
+    echo -e "  ${GREEN}✓${NC} Cockpit + Netdata: installed, tunnel-only access"
+  else
+    echo -e "  ${GREEN}✓${NC} Cockpit: installed, tunnel-only access"
+    echo -e "  ${YELLOW}⚠${NC} Netdata: install failed — install manually"
+  fi
 else
-  echo -e "  ${GREEN}✓${NC} Cockpit: installed, tunnel-only access"
-  echo -e "  ${YELLOW}⚠${NC} Netdata: install failed — install manually"
+  echo -e "  ${DIM}–${NC} Monitoring: skipped"
 fi
 echo -e "  ${GREEN}✓${NC} rkhunter + auditd + AIDE: intrusion detection active"
 echo -e "  ${GREEN}✓${NC} Legal banners + password policy enforced"
