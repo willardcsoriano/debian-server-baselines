@@ -581,8 +581,8 @@ pass "Hardening index: $SCORE"
 # ─── 19. Operator tooling ────────────────────────────────────────────────────
 
 section "19/20 Operator tooling"
-DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git tmux jq
-pass "git, tmux, jq installed"
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git tmux jq htop
+pass "git, tmux, jq, htop installed"
 
 # Clean up packages pulled in transitively but no longer needed
 DEBIAN_FRONTEND=noninteractive apt-get autoremove -y -qq
@@ -649,7 +649,7 @@ echo -e "  ${GREEN}✓${NC} Debian-goodies + PAM strength installed"
 echo -e "  ${GREEN}✓${NC} Unused kernel modules blacklisted"
 echo -e "  ${GREEN}✓${NC} Process accounting (acct + sysstat) active"
 echo -e "  ${GREEN}✓${NC} Lynis: hardening index ${BOLD}$SCORE${NC}"
-echo -e "  ${GREEN}✓${NC} Operator tooling: git, tmux, jq"
+echo -e "  ${GREEN}✓${NC} Operator tooling: git, tmux, jq, htop"
 if [[ -n "$LOG_SERVER" ]]; then
   echo -e "  ${GREEN}✓${NC} Remote syslog: security logs → $LOG_SERVER:514 via TCP"
 else
