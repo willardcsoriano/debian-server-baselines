@@ -10,6 +10,7 @@ Run as root on a fresh Debian 13 server. Re-run anytime — the script is idempo
 
 - [What it does](#what-it-does)
 - [Requirements](#requirements)
+- [dev-baseline.sh](#dev-baselinesh)
 - [What happens](#what-happens)
 - [Idempotent — safe to re-run](#idempotent-safe-to-re-run)
 - [After it runs](#after-it-runs)
@@ -44,7 +45,6 @@ Most hardening scripts lock your server and disappear. This one installs the too
 | Process accounting | `acct` + `sysstat` for command and resource history |
 | Lynis | Security audit — scores your server, flags what to fix next |
 | Operator tooling | Installs `git`, `tmux`, `jq` — not present on Debian minimal, needed to operate the box |
-| Docker | Optional — prompted at start; installs rootless Docker CE (system daemon disabled, user daemon under the sudo account) |
 | Remote syslog | Optional — forwards auth, auditd, fail2ban, kernel, daemon logs to a remote syslog server via TCP |
 
 ## Requirements
@@ -53,9 +53,13 @@ Most hardening scripts lock your server and disappear. This one installs the too
 - Run as root (or via `sudo` on re-runs)
 - SSH public key already added to `/root/.ssh/authorized_keys`
 
+## dev-baseline.sh
+
+For servers you also develop on, run `dev-baseline.sh` after `baseline.sh`. It installs rootless Docker CE (system daemon disabled, user daemon under the sudo account) and will grow to include other dev tooling (gh, Node, etc.) over time.
+
 ## What happens
 
-The script asks for two things on first run: your sudo username (pre-filled on re-runs) and a sudo password for that user. Everything else is automatic.
+The script asks for your sudo username on first run (pre-filled on re-runs) and a sudo password for that user. Everything else is automatic.
 
 One pause on first run: before locking down SSH, it asks you to verify your new account works in a second terminal. This prevents lockouts. Re-runs skip this pause automatically.
 
