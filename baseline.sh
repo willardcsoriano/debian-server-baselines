@@ -101,6 +101,20 @@ set_login_def() {
   fi
 }
 
+# ─── Hostname ─────────────────────────────────────────────────────────────────
+
+# sudo looks up the hostname for its log lines.  If /etc/hosts has no entry
+# for it, every sudo invocation emits "unable to resolve host <name>".
+# 127.0.1.1 is the Debian convention for a local hostname with no real DNS
+# entry; 127.0.0.1 is left for localhost and is not touched.
+_hostname=$(hostname -s)
+if ! grep -qE "^127\.0\.1\.1[[:space:]]+$_hostname\b" /etc/hosts; then
+  echo "127.0.1.1 $_hostname" >> /etc/hosts
+  pass "127.0.1.1 → $_hostname added to /etc/hosts"
+else
+  pass "/etc/hosts: 127.0.1.1 → $_hostname already present"
+fi
+
 # ─── 1. System updates ────────────────────────────────────────────────────────
 
 section "1/20  System updates"
@@ -635,6 +649,7 @@ echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━�
 echo -e "${BOLD}  debian-baseline complete${NC}"
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
+echo -e "  ${GREEN}✓${NC} /etc/hosts: 127.0.1.1 → $_hostname (sudo lookup fix)"
 echo -e "  ${GREEN}✓${NC} System updated + auto security patches"
 echo -e "  ${GREEN}✓${NC} Sudo user: ${BOLD}$NEW_USER${NC}"
 echo -e "  ${GREEN}✓${NC} SSH: root off, key-only, restricted forwarding"
