@@ -2,7 +2,7 @@
 
 ## Overview
 
-This is the section-by-section explainer for `baseline.sh` — what each of the 21 numbered sections actually does to a Debian 13 box, which files it writes, which services it starts, the attack it's defending against, and the command you can run afterward to verify it took effect. It complements `README.md` (the one-glance feature table) and is the right place to look when something on your hardened server surprises you or when you want to understand a step before re-running. Sections are linear (1 → 21), preceded by a pre-flight check description, and followed by reference material: a paths cheatsheet, day-to-day usage commands, the re-run preservation contract, deliberate gaps the script does not try to close, troubleshooting, and a note on why this script is server-flavored and would hurt a desktop. Skim the "At a glance" block below if 60 seconds is all you have.
+This is the section-by-section explainer for `baseline.sh` — what each of the 20 numbered sections actually does to a Debian 13 box, which files it writes, which services it starts, the attack it's defending against, and the command you can run afterward to verify it took effect. It complements `README.md` (the one-glance feature table) and is the right place to look when something on your hardened server surprises you or when you want to understand a step before re-running. Sections are linear (1 → 20), preceded by a pre-flight check description, and followed by reference material: a paths cheatsheet, day-to-day usage commands, the re-run preservation contract, deliberate gaps the script does not try to close, troubleshooting, and a note on why this script is server-flavored and would hurt a desktop. Skim the "At a glance" block below if 60 seconds is all you have.
 
 ## Table of Contents
 
@@ -10,32 +10,31 @@ This is the section-by-section explainer for `baseline.sh` — what each of the 
 - [At a glance](#at-a-glance)
 - [Threat model](#threat-model)
 - [Pre-flight (before any section runs)](#pre-flight-before-any-section-runs)
-- [1/21 — System updates](#121-system-updates)
-- [2/21 — Automatic security updates](#221-automatic-security-updates)
-- [3/21 — Sudo user](#321-sudo-user)
-- [4/21 — SSH key copy](#421-ssh-key-copy)
-- [5/21 — SSH safety check (first run only)](#521-ssh-safety-check-first-run-only)
-- [6/21 — SSH hardening](#621-ssh-hardening)
-- [7/21 — Firewall (UFW)](#721-firewall-ufw)
-- [8/21 — fail2ban (brute-force protection)](#821-fail2ban-brute-force-protection)
-- [9/21 — Kernel hardening (sysctl)](#921-kernel-hardening-sysctl)
-- [10/21 — AppArmor](#1021-apparmor)
-- [11/21 — Monitoring (Cockpit + Netdata)](#1121-monitoring-cockpit-netdata)
-- [12/21 — Intrusion detection (rkhunter + auditd + AIDE)](#1221-intrusion-detection-rkhunter-auditd-aide)
+- [1/20 — System updates](#120-system-updates)
+- [2/20 — Automatic security updates](#220-automatic-security-updates)
+- [3/20 — Sudo user](#320-sudo-user)
+- [4/20 — SSH key copy](#420-ssh-key-copy)
+- [5/20 — SSH safety check (first run only)](#520-ssh-safety-check-first-run-only)
+- [6/20 — SSH hardening](#620-ssh-hardening)
+- [7/20 — Firewall (UFW)](#720-firewall-ufw)
+- [8/20 — fail2ban (brute-force protection)](#820-fail2ban-brute-force-protection)
+- [9/20 — Kernel hardening (sysctl)](#920-kernel-hardening-sysctl)
+- [10/20 — AppArmor](#1020-apparmor)
+- [11/20 — Monitoring (Cockpit + Netdata)](#1120-monitoring-cockpit-netdata)
+- [12/20 — Intrusion detection (rkhunter + auditd + AIDE)](#1220-intrusion-detection-rkhunter-auditd-aide)
   - [rkhunter](#rkhunter)
   - [AIDE (Advanced Intrusion Detection Environment)](#aide-advanced-intrusion-detection-environment)
   - [auditd](#auditd)
-- [13/21 — Legal banners](#1321-legal-banners)
-- [14/21 — Password policy (login.defs)](#1421-password-policy-logindefs)
-- [15/21 — Debian goodies + PAM strength](#1521-debian-goodies-pam-strength)
-- [16/21 — Disable unused kernel modules + restrict compilers](#1621-disable-unused-kernel-modules-restrict-compilers)
+- [13/20 — Legal banners](#1320-legal-banners)
+- [14/20 — Password policy (login.defs)](#1420-password-policy-logindefs)
+- [15/20 — Debian goodies + PAM strength](#1520-debian-goodies-pam-strength)
+- [16/20 — Disable unused kernel modules + restrict compilers](#1620-disable-unused-kernel-modules-restrict-compilers)
   - [Kernel module blacklist](#kernel-module-blacklist)
   - [Compiler restriction](#compiler-restriction)
-- [17/21 — Process accounting (acct + sysstat)](#1721-process-accounting-acct-sysstat)
-- [18/21 — Security audit (Lynis)](#1821-security-audit-lynis)
-- [19/21 — Operator tooling](#1921-operator-tooling)
-- [20/21 — Docker rootless (optional)](#2021-docker-rootless-optional)
-- [21/21 — Remote syslog (optional)](#2121-remote-syslog-optional)
+- [17/20 — Process accounting (acct + sysstat)](#1720-process-accounting-acct-sysstat)
+- [18/20 — Security audit (Lynis)](#1820-security-audit-lynis)
+- [19/20 — Operator tooling](#1920-operator-tooling)
+- [20/20 — Remote syslog (optional)](#2020-remote-syslog-optional)
 - [Where things live (paths cheatsheet)](#where-things-live-paths-cheatsheet)
 - [How to use the box after the script runs](#how-to-use-the-box-after-the-script-runs)
 - [What re-running the script does (and doesn't)](#what-re-running-the-script-does-and-doesnt)
@@ -62,7 +61,7 @@ If you only have 60 seconds, here's what changes about your box after `baseline.
 
 **Monitoring & forensics**
 
-- [Cockpit + Netdata](#1121--monitoring-cockpit--netdata) installed, reachable only via SSH tunnel — never exposed publicly
+- [Cockpit + Netdata](#1120--monitoring-cockpit--netdata) — optional, prompted at start; reachable only via SSH tunnel if installed
 - [auditd](#1221--intrusion-detection-rkhunter--auditd--aide) logs identity changes, SSH config edits, audit tampering, login records, time changes, module loads
 - [AIDE](#1221--intrusion-detection-rkhunter--auditd--aide) maintains a filesystem-integrity baseline so you can detect drift
 - [rkhunter](#1221--intrusion-detection-rkhunter--auditd--aide) scans for known rootkit signatures
@@ -79,7 +78,7 @@ If you only have 60 seconds, here's what changes about your box after `baseline.
 
 - Log in: `ssh <user>@<server-ip>` with your key, then `sudo` with the password you set
 - Read logs: `journalctl -f`, `sudo ausearch -k identity`, `sudo fail2ban-client status sshd`
-- Web UIs (Cockpit, Netdata): via SSH tunnel (commands in [section 11](#1121--monitoring-cockpit--netdata))
+- Web UIs (Cockpit, Netdata): via SSH tunnel if installed (commands in [section 11](#1120--monitoring-cockpit--netdata))
 - Re-run anytime — the script is idempotent and preserves your customizations
 
 **Not appropriate for**
@@ -121,7 +120,7 @@ Then it asks for the sudo username — pre-filled from the existing sudo group o
 
 ---
 
-## 1/21 — System updates
+## 1/20 — System updates
 
 **What it does:** Runs `apt-get update` then `apt-get upgrade -y` to bring every installed package to its current version.
 
@@ -133,7 +132,7 @@ Then it asks for the sudo username — pre-filled from the existing sudo group o
 
 ---
 
-## 2/21 — Automatic security updates
+## 2/20 — Automatic security updates
 
 **What it does:** Installs `unattended-upgrades` and enables its systemd timer. From now on, security patches install themselves automatically.
 
@@ -148,7 +147,7 @@ Then it asks for the sudo username — pre-filled from the existing sudo group o
 
 ---
 
-## 3/21 — Sudo user
+## 3/20 — Sudo user
 
 **What it does:** Creates a non-root user (or finds the existing one), adds them to the `sudo` group, prompts for a sudo password if they don't have one, and writes a sudoers drop-in.
 
@@ -167,7 +166,7 @@ Then it asks for the sudo username — pre-filled from the existing sudo group o
 
 ---
 
-## 4/21 — SSH key copy
+## 4/20 — SSH key copy
 
 **What it does:** Copies `/root/.ssh/authorized_keys` to `/home/<user>/.ssh/authorized_keys` so the new user can SSH in with the same key root has been using.
 
@@ -185,7 +184,7 @@ ssh-keygen -l -f /home/<user>/.ssh/authorized_keys   # show key fingerprint
 
 ---
 
-## 5/21 — SSH safety check (first run only)
+## 5/20 — SSH safety check (first run only)
 
 **What it does:** Pauses and tells you to open a *second terminal* and SSH in as the new user before letting the script disable root SSH. You type `yes` to confirm.
 
@@ -195,7 +194,7 @@ ssh-keygen -l -f /home/<user>/.ssh/authorized_keys   # show key fingerprint
 
 ---
 
-## 6/21 — SSH hardening
+## 6/20 — SSH hardening
 
 **What it does:** Edits `/etc/ssh/sshd_config` to disable root login, password auth, and a bunch of forwarding features. Backs up the original first, validates the new config with `sshd -t`, then reloads `sshd`.
 
@@ -213,7 +212,7 @@ ssh-keygen -l -f /home/<user>/.ssh/authorized_keys   # show key fingerprint
 | `MaxAuthTries` | `3` | Connection drops after 3 wrong attempts — fail2ban (section 8) bans you for 1h after 5 such drops. |
 | `LoginGraceTime` | `30` | If you don't complete login in 30s, you're disconnected. Limits slow scanning. |
 | `X11Forwarding` | `no` | Server isn't running X — no reason to expose the protocol. |
-| `AllowTcpForwarding` | `no` | Prevents an attacker who has SSH from using your box as a TCP proxy. |
+| `AllowTcpForwarding` | `local` | Allows SSH tunnels from your laptop (VS Code Remote, Cockpit, Netdata) while blocking your box from being used as a TCP relay to other machines. |
 | `AllowAgentForwarding` | `no` | Prevents accidentally forwarding your local SSH agent to a compromised server. |
 | `MaxSessions` | `2` | Caps how many concurrent SSH channels one connection can open. |
 | `ClientAliveCountMax` | `2` | Idle connections get pruned. |
@@ -228,7 +227,7 @@ sudo sshd -T | grep -iE 'permitroot|passwordauth|pubkeyauth|maxauthtries'
 
 ---
 
-## 7/21 — Firewall (UFW)
+## 7/20 — Firewall (UFW)
 
 **What it does:** Installs and enables UFW (Uncomplicated Firewall — a friendly wrapper over iptables/nftables). Default: deny all incoming. Allow only TCP 22 (SSH), 80 (HTTP), 443 (HTTPS).
 
@@ -239,7 +238,7 @@ sudo sshd -T | grep -iE 'permitroot|passwordauth|pubkeyauth|maxauthtries'
 
 **Threat model:** Without a firewall, every service that binds to `0.0.0.0` is exposed to the entire internet. With UFW, only the three ports you explicitly allow accept connections. Everything else (databases listening on default ports, dev servers, monitoring daemons) is dropped at the kernel level.
 
-**Note on Cockpit (9090) and Netdata (19999):** These ports are *deliberately not opened* in UFW. You reach them via SSH tunnel only (see sections 11 below).
+**Note on Cockpit (9090) and Netdata (19999):** These ports are *deliberately not opened* in UFW. If you opted in to monitoring (section 11), you reach them via SSH tunnel only.
 
 **Verify after:**
 ```bash
@@ -249,7 +248,7 @@ sudo iptables -L INPUT -n -v   # raw rules
 
 ---
 
-## 8/21 — fail2ban (brute-force protection)
+## 8/20 — fail2ban (brute-force protection)
 
 **What it does:** Installs fail2ban, writes a baseline jail config, and starts it. fail2ban watches `auth.log`; if an IP fails SSH 5 times in 10 minutes, it gets banned for 1 hour via the firewall.
 
@@ -269,7 +268,7 @@ sudo journalctl -u fail2ban -f       # live log of bans
 
 ---
 
-## 9/21 — Kernel hardening (sysctl)
+## 9/20 — Kernel hardening (sysctl)
 
 **What it does:** Writes a kernel-parameters file to `/etc/sysctl.d/99-hardening.conf` and applies it. These are runtime kernel switches that change how the network stack and process memory behave.
 
@@ -306,7 +305,7 @@ findmnt /tmp   # should show tmpfs with noexec,nosuid,nodev
 
 ---
 
-## 10/21 — AppArmor
+## 10/20 — AppArmor
 
 **What it does:** Installs AppArmor (Linux's mandatory access control system) and ensures profiles in `/etc/apparmor.d/` are loaded in *enforce* mode.
 
@@ -325,18 +324,20 @@ You should see profiles listed under "enforce mode." Six is typical on a fresh D
 
 ---
 
-## 11/21 — Monitoring (Cockpit + Netdata)
+## 11/20 — Monitoring (Cockpit + Netdata)
 
-**What it does:** Installs two web-based monitoring tools, but doesn't open their ports in the firewall — you reach them over SSH tunnels only.
+**Optional** — prompted at preflight, default N. Auto-detected on re-run via installed packages so existing installs are preserved. Skip this section on locked-down servers (DB nodes, CI runners, k8s workers) where a browser UI is unnecessary attack surface.
 
-**Files/state changed:**
+**What it does (when opted in):** Installs two web-based monitoring tools, but doesn't open their ports in the firewall — you reach them over SSH tunnels only.
+
+**Files/state changed (when opted in):**
 - Package: `cockpit`
 - Service: `cockpit.socket` enabled (web on port 9090, localhost-bound)
 - Netdata installed to `/opt/netdata/` via its kickstart script (web on port 19999, also bound)
 
 **Cockpit (port 9090):** Web UI for server management — view services, logs, network interfaces, accounts, software updates, terminal access. Think "GUI for systemd."
 
-**Netdata (port 19999):** Real-time metrics — CPU, RAM, disk I/O, network, processes, Docker containers. Refreshes every second. Good for "is this thing actually loaded?"
+**Netdata (port 19999):** Real-time metrics — CPU, RAM, disk I/O, network, processes. Refreshes every second. Good for "is this thing actually loaded?"
 
 **Why tunnel-only:** Both expose powerful interfaces (Cockpit can install packages, restart services, etc.). Putting them on the public internet would be giving attackers a GUI for breaking in. Tunneling means: only someone with your SSH key can reach them.
 
@@ -353,7 +354,7 @@ ssh -N -L 19999:localhost:19999 <user>@<server-ip>
 
 ---
 
-## 12/21 — Intrusion detection (rkhunter + auditd + AIDE)
+## 12/20 — Intrusion detection (rkhunter + auditd + AIDE)
 
 Three different tools, three different jobs:
 
@@ -407,7 +408,7 @@ sudo aureport --summary          # high-level overview
 
 ---
 
-## 13/21 — Legal banners
+## 13/20 — Legal banners
 
 **What it does:** Writes warning text to `/etc/issue` (shown at local console login) and `/etc/issue.net` (shown at SSH login, before auth).
 
@@ -419,7 +420,7 @@ sudo aureport --summary          # high-level overview
 
 ---
 
-## 14/21 — Password policy (login.defs)
+## 14/20 — Password policy (login.defs)
 
 **What it does:** Sets password aging defaults in `/etc/login.defs` and applies them to existing sudo users via `chage`.
 
@@ -448,7 +449,7 @@ sudo chage -l <username>     # shows aging info per user
 
 ---
 
-## 15/21 — Debian goodies + PAM strength
+## 15/20 — Debian goodies + PAM strength
 
 **What it does:** Installs a bundle of small Debian-native packages that improve security or visibility:
 
@@ -472,7 +473,7 @@ cat /etc/needrestart/conf.d/50-autorestart.conf
 
 ---
 
-## 16/21 — Disable unused kernel modules + restrict compilers
+## 16/20 — Disable unused kernel modules + restrict compilers
 
 **What it does:** Two unrelated hardening steps:
 
@@ -498,7 +499,7 @@ lsmod | grep -E 'usb_storage|firewire'   # should be empty after reboot
 
 ---
 
-## 17/21 — Process accounting (acct + sysstat)
+## 17/20 — Process accounting (acct + sysstat)
 
 **What it does:**
 - **acct**: logs every process that ran, with user, command, runtime, and exit status. Queryable later with `lastcomm` and `sa`.
@@ -522,7 +523,7 @@ sar -u 1 5      # live CPU stats
 
 ---
 
-## 18/21 — Security audit (Lynis)
+## 18/20 — Security audit (Lynis)
 
 **What it does:** Installs Lynis (from CISOfy's apt repo, not Debian's stale package), runs a full audit, saves the report.
 
@@ -542,51 +543,28 @@ sudo lynis show details <TEST-ID>    # explain a specific finding
 
 ---
 
-## 19/21 — Operator tooling
+## 19/20 — Operator tooling
 
-**What it does:** Installs the minimal set of operator tools not present on a fresh Debian 13 minimal install: `git`, `tmux`, and `jq`.
+**What it does:** Installs the minimal set of operator tools not present on a fresh Debian 13 minimal install: `git`, `tmux`, `jq`, and `htop`.
 
-**Why here and not in vps-01:** These are useful to anyone operating the box, not personal preferences — `git` to manage repos, `tmux` to keep sessions alive over SSH, `jq` for shell-level JSON inspection. They're host-level utilities, same as `curl` or `htop`, which Debian already ships.
+| Tool | What it does |
+|---|---|
+| `git` | Version control — manage repos, pull configs, track changes |
+| `tmux` | Terminal multiplexer — keep sessions alive after SSH disconnects, split panes |
+| `jq` | Shell-level JSON parsing — `curl api/... \| jq '.field'` |
+| `htop` | Interactive process viewer — SSH in and run `htop` for an instant CPU/RAM/process snapshot |
 
 **Files/state changed:**
-- Packages: `git`, `tmux`, `jq`
+- Packages: `git`, `tmux`, `jq`, `htop`
 
 **Verify:**
 ```bash
-git --version && tmux -V && jq --version
+git --version && tmux -V && jq --version && htop --version
 ```
 
 ---
 
-## 20/21 — Docker rootless (optional)
-
-**What it does:** Prompts during preflight whether to install Docker. If yes, adds Docker's official apt repo (deb822 format), installs the full Docker CE stack plus `docker-ce-rootless-extras` and `uidmap`, then **disables the system-mode daemon** and sets up a rootless daemon under the sudo user's account. The user daemon is enabled via `systemctl --user enable --now docker`, `loginctl enable-linger` keeps it alive after logout, and `DOCKER_HOST` is appended to `~/.bashrc`. Skipped silently if the user answers no. On re-run, auto-detected via the sources file or the user's Docker socket.
-
-**The login gate:** Rootless Docker can only be bootstrapped against a live user session — root can't fake one. Before doing any setup, this section checks for `/run/user/<uid>/bus` (the DBus session socket, present when the user has an active login OR linger is already on from a previous run). If neither is true, the script pauses and tells you to open a second terminal and `ssh $NEW_USER@$SERVER_IP`. You leave that session open, press Enter back in the script terminal, and setup continues. This is the only place in the script that can't run unattended on a fresh box — and it only fires if you said yes to Docker.
-
-**Why rootless:** The system-mode daemon runs as root — a container escape or daemon exploit owns the box. In rootless mode the daemon runs as an unprivileged user; a worst-case compromise is limited to that user's context. The one-time setup cost is worth the permanent reduction in blast radius.
-
-**Why optional:** Not every box runs containers. Opting in is one keypress; opting out costs nothing.
-
-**Files/state changed (when installed):**
-- GPG key: `/etc/apt/keyrings/docker.asc`
-- Apt source: `/etc/apt/sources.list.d/docker.sources`
-- Packages: `docker-ce`, `docker-ce-cli`, `containerd.io`, `docker-buildx-plugin`, `docker-compose-plugin`, `docker-ce-rootless-extras`, `uidmap`
-- System daemon: `docker.service` and `docker.socket` disabled
-- User daemon: rootless daemon installed under `$NEW_USER`, enabled and lingered
-- Shell: `DOCKER_HOST` and `PATH` appended to `~/.bashrc`
-
-**Verify:**
-```bash
-# as the sudo user (new shell or after sourcing .bashrc)
-docker info   # Context should show: rootless
-docker compose version
-systemctl --user status docker
-```
-
----
-
-## 21/21 — Remote syslog (optional)
+## 20/20 — Remote syslog (optional)
 
 **What it does:** Prompts during preflight for a remote syslog server IP or hostname. If provided, configures rsyslog to forward security-relevant log facilities to that server on port 514 via TCP, and enables the auditd syslog plugin so audit events flow through rsyslog as well. Skipped if no server is specified. On re-run, auto-detected via the existing config file.
 
@@ -699,7 +677,6 @@ These are conscious omissions, not oversights:
 | GRUB boot password | Risk of locking yourself out of recovery on a cloud VPS. |
 | Separate `/home`, `/var`, `/tmp` partitions | Requires reinstall. Out of scope for a post-install hardening script. |
 | SSH on non-standard port (e.g., 2222) | UFW complexity vs marginal benefit. fail2ban handles brute-force on 22. |
-| Remote syslog | Useful for tamper-resistance, but pointless without a destination. Configure manually when you have one. |
 | SELinux | AppArmor is the Debian-native MAC system. Mixing both is messy. |
 | `iptables --policy DROP` directly | UFW provides equivalent functionality with a less foot-gun-prone interface. |
 
@@ -713,7 +690,7 @@ These are conscious omissions, not oversights:
 
 **A service won't restart because of AppArmor:** `sudo journalctl -u apparmor` shows the denial. `sudo aa-complain <profile>` puts it in non-enforcing mode while you investigate.
 
-**Netdata install failed:** The kickstart sometimes fails on first try (network, package conflicts). Re-run the script; it skips section 11's install if the binary is already there. If still failing, the script prints exactly what to run manually.
+**Netdata install failed:** The kickstart sometimes fails on first try (network, package conflicts). Re-run the script; if you opted in to monitoring, section 11 skips Netdata's install if the binary is already there. If still failing, run the kickstart manually: `bash <(curl -fsSL https://get.netdata.cloud/kickstart.sh) --non-interactive --no-updates --disable-telemetry`.
 
 **AIDE complains about lots of changes:** Normal after an `apt upgrade` — package files moved or got new versions. After confirming the changes are legitimate, re-baseline with `sudo aide --init && sudo mv /var/lib/aide/aide.db.new /var/lib/aide/aide.db`.
 
@@ -747,6 +724,6 @@ Third-party hardening scripts (`vps-harden`, `du_setup`, and similar) have well-
 - **Transparent.** It's a single Bash script in a repo you own (or read in full); every change shows up in `git log`.
 - **Idempotent.** Re-runnable any time. Re-runs pick up new sections and refresh policy — there's no "script ran last year and the box has since drifted" failure mode.
 - **Versioned.** Updates propagate by re-running the same `curl | sudo bash` line.
-- **Tuned for one use case.** Built for a single-host Docker VPS with Cockpit/Netdata/Lynis for ongoing visibility, not as a one-size-fits-all tool.
+- **Tuned for servers, not desktops.** Covers every server type — DB nodes, web servers, CI runners, dev VPS — with optional monitoring (Cockpit/Netdata) and Lynis for ongoing visibility.
 
 The argument against generic hardening scripts is correct. The fix isn't manual setup — it's a script you own, maintain, and re-run.
