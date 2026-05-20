@@ -16,7 +16,7 @@ note()    { echo -e "  ${DIM}$1${NC}"; }
 
 clear
 echo -e "${BOLD}debian-remote-syslog${NC}"
-echo -e "${DIM}Forward security logs to a remote syslog server — run as root, after debian-baseline${NC}"
+echo -e "${DIM}Forward security logs to a remote syslog server — run as root, after debian-server-baseline${NC}"
 echo ""
 
 [[ $EUID -ne 0 ]]          && fail "Must run as root (or via sudo)."
@@ -26,14 +26,14 @@ echo ""
 [[ "$ID" == "debian" ]]    || fail "Debian only. Detected: $ID"
 [[ "$VERSION_ID" -ge 13 ]] || fail "Requires Debian 13+. Detected: $VERSION_ID"
 
-# Confirm baseline.sh has run — we depend on auditd from section 12 and on
+# Confirm debian-server-baseline.sh has run — we depend on auditd from section 12 and on
 # rsyslog/SSH hardening being in place.  Mirrors dev-baseline.sh's check.
 grep -q "^PermitRootLogin no" /etc/ssh/sshd_config 2>/dev/null \
-  || fail "debian-baseline.sh has not run on this host (PermitRootLogin still on)."
+  || fail "debian-server-baseline.sh has not run on this host (PermitRootLogin still on)."
 command -v rsyslogd &>/dev/null \
-  || fail "rsyslog is not installed (expected on a Debian-baseline host)."
+  || fail "rsyslog is not installed (expected on a debian-server-baseline host)."
 [[ -d /etc/audit/plugins.d ]] \
-  || fail "auditd plugins dir missing — run debian-baseline.sh first."
+  || fail "auditd plugins dir missing — run debian-server-baseline.sh first."
 
 SERVER_IP=$(hostname -I | awk '{print $1}')
 pass "Debian $VERSION_ID ($VERSION_CODENAME) on $SERVER_IP"
@@ -78,7 +78,7 @@ EOF
 # Forward security-relevant facilities via TCP (@@) to the log server.
 # local6 captures auditd events once the syslog plugin above is active.
 cat > /etc/rsyslog.d/50-remote-syslog.conf <<EOF
-# Managed by debian-baseline/remote-syslog.sh — forward security logs.
+# Managed by debian-server-baseline/remote-syslog.sh — forward security logs.
 auth,authpriv.*   @@${LOG_SERVER}:514
 kern.warning      @@${LOG_SERVER}:514
 daemon.*          @@${LOG_SERVER}:514
