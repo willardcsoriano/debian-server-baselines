@@ -15,7 +15,7 @@ Repo-scoped working notes that supplement [`CLAUDE.md`](CLAUDE.md). `CLAUDE.md` 
 
 ## Next session pickup
 
-This block exists so a future session can resume cold. The role-oriented script refactor landed in 5 commits ending `5dd0674` (docs sweep). Repo layout is now: `debian-server-baseline.sh` (base) + `prod-server.sh` + `dev-server.sh` + `remote-syslog.sh` + `syslog-baseline.sh` (draft). Five commits are unpushed.
+This block exists so a future session can resume cold. The role-oriented script refactor landed in 7 commits ending `fa3947e`, all on `origin/main`. Repo layout is now: `debian-server-baseline.sh` (base) + `prod-server.sh` + `dev-server.sh` + `remote-syslog.sh` + `syslog-baseline.sh` (draft).
 
 ### Open decision: inline vs pre-commit hook for the Docker block
 
@@ -39,18 +39,20 @@ You already use this same hook pattern in your `claude-config` repo (commit-msg 
 
 1. **GitHub repo rename: `debian-baseline` → `debian-server-baseline`** (UI action, not in this checkout). Until done, the `raw.githubusercontent.com/.../debian-server-baseline/...` URLs in `README.md` 404. GitHub auto-redirects the *repo* URL for clones and web; raw content URLs do **not** redirect after rename because both the path and the filename changed. Plan to do this right after pushing the 5 unpushed commits.
 
-2. **`ENV_STACK.md` is untracked.** Worked on in this session; intentionally left out of every commit. When ready: `git add ENV_STACK.md && git commit -m 'docs: add ENV_STACK.md (env-stack defaults + baseline hardening gotchas)'`.
+2. **`shellcheck` was not run.** `shellcheck` isn't installed on the dev host this session ran from. All four scripts pass `bash -n` syntax check. If you want full static analysis: `sudo apt install -y shellcheck`, then run the lint block in `CLAUDE.md` § "Working with the scripts".
 
-3. **`shellcheck` was not run.** `shellcheck` isn't installed on the dev host this session ran from. All four scripts pass `bash -n` syntax check. If you want full static analysis before pushing: `sudo apt install -y shellcheck`, then run the lint block in `CLAUDE.md` § "Working with the scripts".
+3. **Syslog work is fully deferred per your call.** `syslog-baseline.sh` (the receiver-side draft) is still in the repo with its string refs synced to the new names (commit `c044f6b`). The actual rename to `syslog-server.sh` plus any content/feature work — TLS/relp, multi-receiver, schema rewrites, etc. — happens in its own session. Same with `remote-syslog.sh`: per the policy below, it stays as the dormant extracted forwarder until it grows features the in-baseline section 20 can't absorb.
 
-4. **Syslog work is fully deferred per your call.** `syslog-baseline.sh` (the receiver-side draft) is still in the repo with its string refs synced to the new names (commit `c044f6b`). The actual rename to `syslog-server.sh` plus any content/feature work — TLS/relp, multi-receiver, schema rewrites, etc. — happens in its own session. Same with `remote-syslog.sh`: per the policy below, it stays as the dormant extracted forwarder until it grows features the in-baseline section 20 can't absorb.
+4. **Pre-existing broken link (not from this refactor).** `DRIFTCHECK.md` § Overview references a `DRIFT.md` ("General drift methodology lives in `DRIFT.md`") that doesn't exist in the repo. Either create it, drop the reference, or repoint it — your call.
 
-5. **Five commits unpushed** to `origin/main`. `git push` when you're ready — though re-read the diff first if you want to second-guess any of it. Commit summary:
-   - `c06806e` chore: rename baseline.sh → debian-server-baseline.sh
-   - `30ea6f2` feat: add prod-server.sh for container-only prod hosts
-   - `091ee44` refactor: rename dev-baseline.sh → dev-server.sh
-   - `c044f6b` chore: sync stale baseline.sh references in syslog-baseline.sh
+5. **Commits landed on `origin/main`** (most-recent first):
+   - `fa3947e` docs: add next-session pickup notes to STATE.md
+   - `0665490` docs: add ENV_STACK.md
    - `5dd0674` docs: align README/WALKTHROUGH/CLAUDE/STATE/DRIFTCHECK for role-oriented layout
+   - `c044f6b` chore: sync stale baseline.sh references in syslog-baseline.sh
+   - `091ee44` refactor: rename dev-baseline.sh → dev-server.sh
+   - `30ea6f2` feat: add prod-server.sh for container-only prod hosts
+   - `c06806e` chore: rename baseline.sh → debian-server-baseline.sh
 
 ### Context worth preserving (don't re-derive next session)
 
