@@ -15,13 +15,13 @@ note()    { echo -e "  ${DIM}$1${NC}"; }
 # ─── Preflight ────────────────────────────────────────────────────────────────
 
 clear
-echo -e "${BOLD}debian-dev-baseline${NC}"
-echo -e "${DIM}Debian 13 developer tooling — run as your sudo user, after debian-baseline${NC}"
+echo -e "${BOLD}debian-dev-server${NC}"
+echo -e "${DIM}Debian 13 developer tooling — run as your sudo user, after debian-server-baseline${NC}"
 echo ""
 
 # Must run as the sudo user, NOT root.  Rootless Docker, nvm, and Claude Code
 # install per-user; running as root silently breaks the entire workflow.
-[[ $EUID -eq 0 ]] && fail "Run as your sudo user, not root.  Try: bash dev-baseline.sh"
+[[ $EUID -eq 0 ]] && fail "Run as your sudo user, not root.  Try: bash dev-server.sh"
 
 [[ -f /etc/os-release ]] || fail "Cannot detect OS."
 # shellcheck source=/dev/null
@@ -34,13 +34,13 @@ pass "Debian $VERSION_ID ($VERSION_CODENAME) on $SERVER_IP"
 
 # Confirm user has sudo access
 groups | grep -qw sudo \
-  || fail "$USER is not in the sudo group. Run debian-baseline.sh first."
+  || fail "$USER is not in the sudo group. Run debian-server-baseline.sh first."
 
-# Confirm baseline.sh has run: root SSH is off and firewall is active
+# Confirm debian-server-baseline.sh has run: root SSH is off and firewall is active
 grep -q "^PermitRootLogin no" /etc/ssh/sshd_config 2>/dev/null \
-  || fail "debian-baseline.sh has not run on this host (PermitRootLogin still on)."
+  || fail "debian-server-baseline.sh has not run on this host (PermitRootLogin still on)."
 systemctl is-active --quiet ufw \
-  || fail "debian-baseline.sh has not run on this host (UFW not active)."
+  || fail "debian-server-baseline.sh has not run on this host (UFW not active)."
 
 # Confirm a user session is live — required by rootless Docker's systemd user
 # daemon.  An SSH login gives you one automatically.  Running via sudo -s or su
@@ -62,6 +62,10 @@ section "1/5  Docker Engine (rootless) + Compose"
 #   https://docs.docker.com/engine/install/debian/
 #   https://docs.docker.com/engine/security/rootless/
 # Last verified: 2026-05-19
+# NOTE: this block is intentionally duplicated in prod-server.sh — the repo
+# ships scripts via curl|bash (one link per script, no clone), so a shared
+# lib/ helper would break the install model.  Keep both copies in sync;
+# DRIFTCHECK.md tracks the canonical Docker source.
 
 sudo mkdir -p /etc/apt/keyrings
 if [[ ! -f /etc/apt/keyrings/docker.asc ]]; then
@@ -228,7 +232,7 @@ fi
 
 echo ""
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}  debian-dev-baseline complete${NC}"
+echo -e "${BOLD}  debian-dev-server complete${NC}"
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo -e "  ${GREEN}✓${NC} Docker: rootless + Compose, user daemon enabled, linger on"
