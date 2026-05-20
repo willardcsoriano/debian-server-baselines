@@ -27,7 +27,7 @@ echo ""
 [[ "$VERSION_ID" -ge 13 ]] || fail "Requires Debian 13+. Detected: $VERSION_ID"
 
 # Confirm debian-server-baseline.sh has run — we depend on auditd from section 12 and on
-# rsyslog/SSH hardening being in place.  Mirrors dev-baseline.sh's check.
+# rsyslog/SSH hardening being in place.  Mirrors dev-server.sh's check.
 grep -q "^PermitRootLogin no" /etc/ssh/sshd_config 2>/dev/null \
   || fail "debian-server-baseline.sh has not run on this host (PermitRootLogin still on)."
 command -v rsyslogd &>/dev/null \
