@@ -2,53 +2,54 @@
 
 ## Overview
 
-Project-specific drift runbook for `debian-baseline`. Run this whenever you return to the repo after an absence, or when asked to touch any install section. It covers the four components most likely to have changed: Docker, Netdata, Lynis, and the Debian target version. For each one, fetch the canonical URL, compare against the current script, and report any discrepancies before making changes. General drift methodology lives in `DRIFT.md`; this file is the executable checklist for this repo specifically.
+Project-specific drift runbook for `debian-server-baseline`. Run this whenever you return to the repo after an absence, or when asked to touch any install section. It covers the four components most likely to have changed: Docker (lives in **two** role scripts now — see Section 1), Netdata, Lynis, and the Debian target version. For each one, fetch the canonical URL, compare against the current script, and report any discrepancies before making changes. General drift methodology lives in `DRIFT.md`; this file is the executable checklist for this repo specifically.
 
 ## Table of Contents
 
 - [Overview](#overview)
 - [How to invoke](#how-to-invoke)
-- [1. Docker (section 20) — High risk](#1-docker-section-20-high-risk)
-- [2. Netdata (section 11) — Medium risk](#2-netdata-section-11-medium-risk)
-- [3. Lynis (section 18) — Medium risk](#3-lynis-section-18-medium-risk)
+- [1. Docker (prod-server.sh + dev-server.sh, both section 1) — High risk](#1-docker-prod-serversh-dev-serversh-both-section-1-high-risk)
+- [2. Netdata (debian-server-baseline.sh, section 11) — Medium risk](#2-netdata-debian-server-baselinesh-section-11-medium-risk)
+- [3. Lynis (debian-server-baseline.sh, section 18) — Medium risk](#3-lynis-debian-server-baselinesh-section-18-medium-risk)
 - [4. Debian target version — Medium risk](#4-debian-target-version-medium-risk)
 - [5. Quick sanity checks (no fetch required)](#5-quick-sanity-checks-no-fetch-required)
 - [Reporting format](#reporting-format)
 
 ## How to invoke
 
-Tell the agent: `check @DRIFTCHECK.md` or `run the drift check`. The agent fetches each URL below, diffs the findings against `baseline.sh`, and reports what has changed or needs updating. Do not skip a section because it "looks fine" — the point is to verify, not assume.
+Tell the agent: `check @DRIFTCHECK.md` or `run the drift check`. The agent fetches each URL below, diffs the findings against the relevant script(s), and reports what has changed or needs updating. Do not skip a section because it "looks fine" — the point is to verify, not assume.
 
 ---
 
-## 1. Docker (section 20) — High risk
+## 1. Docker (prod-server.sh + dev-server.sh, both section 1) — High risk
 
-**Why:** Docker changes its apt repo format, package names, and rootless install procedure roughly annually.
+**Why:** Docker changes its apt repo format, package names, and rootless install procedure roughly annually. The rootless Docker install is **duplicated** between `prod-server.sh` (section 1/1) and `dev-server.sh` (section 1/5) — the repo's curl-per-script install model precludes a shared `lib/`. Both copies must be edited in lockstep.
 
 **Fetch:**
 - https://docs.docker.com/engine/install/debian/
 - https://docs.docker.com/engine/security/rootless/
 
-**Check against `baseline.sh` section 20:**
+**Check against both `prod-server.sh` section 1 and `dev-server.sh` section 1:**
 - GPG key URL (`curl -fsSL https://download.docker.com/linux/debian/gpg`)
 - Sources file format and content (deb822 block: `Types`, `URIs`, `Suites`, `Components`, `Architectures`, `Signed-By`)
 - Package list: `docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin docker-ce-rootless-extras uidmap`
 - Setup command: `dockerd-rootless-setuptool.sh install`
 - Socket path: `unix:///run/user/$(id -u)/docker.sock`
 - Whether `docker-ce-rootless-extras` is still the package providing the setup tool
+- **Drift between the two copies.** `diff <(sed -n '/^# DRIFT:/,/^pass /p' prod-server.sh) <(sed -n '/^# DRIFT:/,/^pass /p' dev-server.sh)` should be empty modulo indentation. If it isn't, someone updated one and forgot the other.
 
-**Report:** any package renamed, any URL changed, any flag removed or added, any new prerequisite.
+**Report:** any package renamed, any URL changed, any flag removed or added, any new prerequisite. If a change is needed, propose it for **both** scripts in the same commit.
 
 ---
 
-## 2. Netdata (section 11) — Medium risk
+## 2. Netdata (debian-server-baseline.sh, section 11) — Medium risk
 
 **Why:** The kickstart script URL and its flags have changed before. `--dont-wait` and `--noupdate` were renamed; the current flags are `--non-interactive --no-updates --disable-telemetry`.
 
 **Fetch:**
 - https://learn.netdata.cloud/docs/netdata-agent/installation/linux
 
-**Check against `baseline.sh` section 11:**
+**Check against `debian-server-baseline.sh` section 11:**
 - Kickstart URL (`https://get.netdata.cloud/kickstart.sh` — note: NOT `my-netdata.io`, which 307-redirects)
 - Current flag names for non-interactive, no-updates, disable-telemetry
 - Whether the install path `/opt/netdata/bin/netdata` is still correct for skip-detection
@@ -57,14 +58,14 @@ Tell the agent: `check @DRIFTCHECK.md` or `run the drift check`. The agent fetch
 
 ---
 
-## 3. Lynis (section 18) — Medium risk
+## 3. Lynis (debian-server-baseline.sh, section 18) — Medium risk
 
 **Why:** CISOfy controls the apt repo; the GPG key URL and sources format could change.
 
 **Fetch:**
 - https://packages.cisofy.com/community/lynis/deb/
 
-**Check against `baseline.sh` section 18:**
+**Check against `debian-server-baseline.sh` section 18:**
 - GPG key URL (`https://packages.cisofy.com/keys/cisofy-software-public.key`)
 - Sources list entry (`https://packages.cisofy.com/community/lynis/deb/ stable main`)
 - Whether `lynis audit system --quiet --nocolors` flags are still current
@@ -96,17 +97,17 @@ Run these locally — they catch internal drift without network calls:
 
 ```bash
 # Syntax
-bash -n baseline.sh
+bash -n debian-server-baseline.sh prod-server.sh dev-server.sh remote-syslog.sh
 
 # Static analysis
-shellcheck baseline.sh
+shellcheck debian-server-baseline.sh prod-server.sh dev-server.sh remote-syslog.sh
 
-# Section count matches headers
-grep -c 'section "' baseline.sh
-grep -oP '\d+(?=/)' baseline.sh | sort -n | uniq | tail -1   # highest N in N/20
+# Base script section count (should still be 20)
+grep -c 'section "' debian-server-baseline.sh
+grep -oP '\d+(?=/)' debian-server-baseline.sh | sort -n | uniq | tail -1   # highest N in N/20
 
 # Summary block matches section count
-grep -c '✓\|✗\|–' baseline.sh | tail -1
+grep -c '✓\|✗\|–' debian-server-baseline.sh | tail -1
 ```
 
 ---
@@ -125,4 +126,4 @@ Debian:  [OK | NEW STABLE: <version> — decision needed]
 Local:   [OK | <shellcheck findings>]
 ```
 
-If anything is CHANGED, propose the diff to `baseline.sh` before making it.
+If anything is CHANGED, propose the diff to the relevant script(s) before making it. Docker changes must land in **both** `prod-server.sh` and `dev-server.sh` in the same commit.
