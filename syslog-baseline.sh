@@ -16,7 +16,7 @@ note()    { echo -e "  ${DIM}$1${NC}"; }
 
 clear
 echo -e "${BOLD}syslog-baseline${NC}"
-echo -e "${DIM}Debian 13 syslog receiver — run as root, after debian-baseline${NC}"
+echo -e "${DIM}Debian 13 syslog receiver — run as root, after debian-server-baseline${NC}"
 echo ""
 
 [[ $EUID -ne 0 ]] && fail "Must run as root (or via sudo)."
@@ -29,13 +29,13 @@ echo ""
 SERVER_IP=$(hostname -I | awk '{print $1}')
 pass "Debian $VERSION_ID ($VERSION_CODENAME) on $SERVER_IP"
 
-# Confirm baseline.sh has run
+# Confirm debian-server-baseline.sh has run
 grep -q "^PermitRootLogin no" /etc/ssh/sshd_config 2>/dev/null \
-  || fail "debian-baseline.sh has not run on this host (PermitRootLogin still on)."
+  || fail "debian-server-baseline.sh has not run on this host (PermitRootLogin still on)."
 systemctl is-active --quiet ufw \
-  || fail "debian-baseline.sh has not run on this host (UFW not active)."
+  || fail "debian-server-baseline.sh has not run on this host (UFW not active)."
 
-# rsyslog ships with Debian and baseline.sh does not remove it, but
+# rsyslog ships with Debian and debian-server-baseline.sh does not remove it, but
 # confirm it is present before modifying its config.
 command -v rsyslogd &>/dev/null \
   || fail "rsyslogd not found — install rsyslog and re-run."
@@ -89,7 +89,7 @@ pass "rsyslog receiving on TCP 514 — /var/log/remote/<hostname>/<program>.log"
 
 section "2/3  Firewall (UFW 514/tcp)"
 
-# baseline.sh's sender side (section 20) forwards over TCP (@@).  Only TCP
+# debian-server-baseline.sh's sender side (section 20) forwards over TCP (@@).  Only TCP
 # is opened here — UDP syslog is fire-and-forget with no delivery guarantee.
 ufw allow 514/tcp > /dev/null
 pass "UFW: 514/tcp open"
@@ -129,7 +129,7 @@ echo -e "  ${GREEN}✓${NC} UFW: 514/tcp open"
 echo -e "  ${GREEN}✓${NC} logrotate: weekly, 12-week retention, compressed"
 echo ""
 echo -e "  Point senders at: ${BOLD}$SERVER_IP:514${NC}"
-echo -e "  On each sender, answer the remote syslog prompt in debian-baseline.sh"
+echo -e "  On each sender, answer the remote syslog prompt in debian-server-baseline.sh"
 echo -e "  or set it manually in /etc/rsyslog.d/50-remote-syslog.conf."
 echo -e "  ${DIM}This script is idempotent — re-run anytime to refresh.${NC}"
 echo ""
