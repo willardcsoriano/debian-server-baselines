@@ -1,8 +1,8 @@
-# debian-baseline — walkthrough
+# debian-server-baseline — walkthrough
 
 ## Overview
 
-This is the section-by-section explainer for `baseline.sh` — what each of the 20 numbered sections actually does to a Debian 13 box, which files it writes, which services it starts, the attack it's defending against, and the command you can run afterward to verify it took effect. It complements `README.md` (the one-glance feature table) and is the right place to look when something on your hardened server surprises you or when you want to understand a step before re-running. Sections are linear (1 → 20), preceded by a pre-flight check description, and followed by reference material: a paths cheatsheet, day-to-day usage commands, the re-run preservation contract, deliberate gaps the script does not try to close, troubleshooting, and a note on why this script is server-flavored and would hurt a desktop. Skim the "At a glance" block below if 60 seconds is all you have.
+This is the section-by-section explainer for `debian-server-baseline.sh` — what each of the 20 numbered sections actually does to a Debian 13 box, which files it writes, which services it starts, the attack it's defending against, and the command you can run afterward to verify it took effect. It complements `README.md` (the one-glance feature table and install commands for the base + role scripts) and is the right place to look when something on your hardened server surprises you or when you want to understand a step before re-running. This file is scoped to the base — role scripts (`prod-server.sh`, `dev-server.sh`, `remote-syslog.sh`) are documented in `README.md`. Sections are linear (1 → 20), preceded by a pre-flight check description, and followed by reference material: a paths cheatsheet, day-to-day usage commands, the re-run preservation contract, deliberate gaps the script does not try to close, troubleshooting, and a note on why this script is server-flavored and would hurt a desktop. Skim the "At a glance" block below if 60 seconds is all you have.
 
 ## Table of Contents
 
@@ -45,7 +45,7 @@ This is the section-by-section explainer for `baseline.sh` — what each of the 
 
 ## At a glance
 
-If you only have 60 seconds, here's what changes about your box after `baseline.sh` finishes.
+If you only have 60 seconds, here's what changes about your box after `debian-server-baseline.sh` finishes.
 
 **Login surface**
 
@@ -719,7 +719,7 @@ Third-party hardening scripts (`vps-harden`, `du_setup`, and similar) have well-
 - Updates to the script don't propagate to already-provisioned servers.
 - Opinionated in ways that conflict with specific workloads.
 
-`debian-baseline` addresses each:
+`debian-server-baseline` addresses each:
 
 - **Transparent.** It's a single Bash script in a repo you own (or read in full); every change shows up in `git log`.
 - **Idempotent.** Re-runnable any time. Re-runs pick up new sections and refresh policy — there's no "script ran last year and the box has since drifted" failure mode.
