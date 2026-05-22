@@ -86,6 +86,8 @@ Same Docker setup as `prod-server.sh`, plus:
 - Claude Code CLI (`@anthropic-ai/claude-code`, installed via `npm -g` — the only npm-global package on the host)
 - GitHub CLI (`gh`) from `cli.github.com` apt repo
 - GNU `make` for project-level orchestration
+- Bitwarden CLI (`bw`) — standalone binary from `bitwarden/clients` GitHub releases, installed to `~/.local/bin` (no `npm -g`)
+- Bitwarden Secrets Manager CLI (`bws`) — standalone binary from `bitwarden/sdk-sm` GitHub releases, sha256-verified, installed to `~/.local/bin`
 
 ### remote-syslog.sh — log forwarding
 
