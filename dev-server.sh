@@ -53,9 +53,9 @@ _user_bus="/run/user/$_user_uid/bus"
 pass "Preflight OK — $USER, session confirmed"
 echo ""
 
-# ─── 1/5  Docker Engine (rootless) + Compose ─────────────────────────────────
+# ─── 1/7  Docker Engine (rootless) + Compose ─────────────────────────────────
 
-section "1/5  Docker Engine (rootless) + Compose"
+section "1/7  Docker Engine (rootless) + Compose"
 
 # DRIFT: apt repo format, package names, and rootless install procedure
 # change roughly annually.  Verify before editing:
@@ -134,9 +134,9 @@ fi
 
 pass "Docker (rootless) + Compose installed; user daemon enabled; linger on"
 
-# ─── 2/5  nvm + Node LTS ─────────────────────────────────────────────────────
+# ─── 2/7  nvm + Node LTS ─────────────────────────────────────────────────────
 
-section "2/5  nvm + Node LTS"
+section "2/7  nvm + Node LTS"
 
 # DRIFT: version string in the raw GitHub URL changes with every nvm release.
 # Check the latest tag before editing:
@@ -161,18 +161,18 @@ nvm alias default 'lts/*'
 NODE_VER=$(node --version)
 pass "nvm installed; Node $NODE_VER (LTS) active"
 
-# ─── 3/5  Corepack ───────────────────────────────────────────────────────────
+# ─── 3/7  Corepack ───────────────────────────────────────────────────────────
 
-section "3/5  Corepack"
+section "3/7  Corepack"
 
 # Enables pnpm and yarn on demand per project via package.json#packageManager.
 # No global install needed; corepack downloads the right version at first use.
 corepack enable
 pass "Corepack enabled"
 
-# ─── 4/5  Claude Code CLI ────────────────────────────────────────────────────
+# ─── 4/7  Claude Code CLI ────────────────────────────────────────────────────
 
-section "4/5  Claude Code CLI"
+section "4/7  Claude Code CLI"
 
 # DRIFT: package name and recommended install command may change.
 # Verify before editing:
@@ -188,9 +188,9 @@ else
   pass "Claude Code CLI installed ($CLAUDE_VER)"
 fi
 
-# ─── 5/5  Operator extras: gh, make ──────────────────────────────────────────
+# ─── 5/7  Operator extras: gh, make ──────────────────────────────────────────
 
-section "5/5  Operator extras (gh, make)"
+section "5/7  Operator extras (gh, make)"
 
 # ── gh ────────────────────────────────────────────────────────────────────────
 
@@ -228,6 +228,106 @@ else
   pass "make installed"
 fi
 
+# ─── 6/7  Bitwarden CLI (bw) ─────────────────────────────────────────────────
+
+section "6/7  Bitwarden CLI (bw)"
+
+# DRIFT: bw is published as prebuilt zips on GitHub releases under
+# bitwarden/clients with tag format cli-vYYYY.M.P.  Asset names follow
+# bw-linux-<version>.zip (amd64) and bw-linux-arm64-<version>.zip (arm64).
+# Bitwarden's documented bitwarden.com/download/?app=cli&platform=linux
+# redirect serves amd64 only — GitHub releases give arch coverage and
+# version visibility.  Verify if release-asset naming changes:
+#   https://bitwarden.com/help/cli/
+#   https://github.com/bitwarden/clients/releases
+# ENV_STACK.md forbids npm -g for anything besides Claude Code, so the
+# standalone binary is the only path that fits.
+# Last verified: 2026-05-22
+
+# Per-user binary dir shared with bws (next section); ensure it exists and
+# is on PATH for future shells before either install needs it.
+mkdir -p "$HOME/.local/bin"
+if ! grep -q 'HOME/.local/bin' "$HOME/.bashrc" 2>/dev/null; then
+  cat >> "$HOME/.bashrc" <<'EOF'
+
+# Per-user binaries (bw, bws)
+export PATH="$HOME/.local/bin:$PATH"
+EOF
+fi
+export PATH="$HOME/.local/bin:$PATH"
+
+# unzip is required by both bw and bws install steps; apt-get is idempotent.
+sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq unzip
+
+if command -v bw &>/dev/null; then
+  BW_VER=$(bw --version 2>/dev/null || echo "installed")
+  pass "Bitwarden CLI already installed ($BW_VER)"
+else
+  _bw_tag=$(curl -fsSL https://api.github.com/repos/bitwarden/clients/releases \
+    | grep -oP '"tag_name":\s*"\Kcli-v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+  [[ -n "$_bw_tag" ]] || fail "Could not determine latest bw release tag"
+  _bw_ver="${_bw_tag#cli-v}"
+
+  case "$(dpkg --print-architecture)" in
+    amd64) _bw_asset="bw-linux-${_bw_ver}.zip" ;;
+    arm64) _bw_asset="bw-linux-arm64-${_bw_ver}.zip" ;;
+    *)     fail "Unsupported architecture for bw: $(dpkg --print-architecture)" ;;
+  esac
+
+  _tmp=$(mktemp -d)
+  curl -fsSL -o "$_tmp/bw.zip" \
+    "https://github.com/bitwarden/clients/releases/download/${_bw_tag}/${_bw_asset}"
+  unzip -q "$_tmp/bw.zip" -d "$_tmp"
+  install -m 0755 "$_tmp/bw" "$HOME/.local/bin/bw"
+  rm -rf "$_tmp"
+  BW_VER=$(bw --version 2>/dev/null || echo "installed")
+  pass "Bitwarden CLI installed ($BW_VER)"
+fi
+
+# ─── 7/7  Bitwarden Secrets Manager CLI (bws) ────────────────────────────────
+
+section "7/7  Bitwarden Secrets Manager CLI (bws)"
+
+# DRIFT: bws is published as prebuilt zips on GitHub releases under
+# bitwarden/sdk-sm with tag format bws-vX.Y.Z.  Asset names follow
+# bws-<arch>-unknown-linux-gnu-<version>.zip with a sibling
+# bws-sha256-checksums-<version>.txt.  cargo install bws is a non-starter:
+# this host's compilers are mode 750 (root-only) per the baseline.
+# Verify if Bitwarden ships an official install script or moves the repo:
+#   https://bitwarden.com/help/secrets-manager-cli/
+#   https://github.com/bitwarden/sdk-sm/releases
+# Last verified: 2026-05-22
+
+if command -v bws &>/dev/null; then
+  BWS_VER=$(bws --version 2>/dev/null || echo "installed")
+  pass "bws already installed ($BWS_VER)"
+else
+  _bws_tag=$(curl -fsSL https://api.github.com/repos/bitwarden/sdk-sm/releases \
+    | grep -oP '"tag_name":\s*"\Kbws-v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+  [[ -n "$_bws_tag" ]] || fail "Could not determine latest bws release tag"
+  _bws_ver="${_bws_tag#bws-v}"
+
+  case "$(dpkg --print-architecture)" in
+    amd64) _bws_arch="x86_64-unknown-linux-gnu" ;;
+    arm64) _bws_arch="aarch64-unknown-linux-gnu" ;;
+    *)     fail "Unsupported architecture for bws: $(dpkg --print-architecture)" ;;
+  esac
+  _bws_asset="bws-${_bws_arch}-${_bws_ver}.zip"
+
+  _tmp=$(mktemp -d)
+  curl -fsSL -o "$_tmp/$_bws_asset" \
+    "https://github.com/bitwarden/sdk-sm/releases/download/${_bws_tag}/${_bws_asset}"
+  curl -fsSL -o "$_tmp/checksums.txt" \
+    "https://github.com/bitwarden/sdk-sm/releases/download/${_bws_tag}/bws-sha256-checksums-${_bws_ver}.txt"
+  ( cd "$_tmp" && grep " ${_bws_asset}\$" checksums.txt | sha256sum -c - >/dev/null ) \
+    || fail "bws checksum mismatch for ${_bws_asset}"
+  unzip -q "$_tmp/$_bws_asset" -d "$_tmp"
+  install -m 0755 "$_tmp/bws" "$HOME/.local/bin/bws"
+  rm -rf "$_tmp"
+  BWS_VER=$(bws --version 2>/dev/null || echo "installed")
+  pass "bws installed ($BWS_VER)"
+fi
+
 # ─── Summary ─────────────────────────────────────────────────────────────────
 
 echo ""
@@ -241,8 +341,10 @@ echo -e "  ${GREEN}✓${NC} Corepack: pnpm and yarn available on demand"
 echo -e "  ${GREEN}✓${NC} Claude Code: $CLAUDE_VER"
 echo -e "  ${GREEN}✓${NC} gh: $GH_VER"
 echo -e "  ${GREEN}✓${NC} make: $(make --version | head -1)"
+echo -e "  ${GREEN}✓${NC} Bitwarden CLI: $BW_VER"
+echo -e "  ${GREEN}✓${NC} Bitwarden Secrets Manager CLI: $BWS_VER"
 echo ""
 echo -e "  Log in as: ${BOLD}ssh $USER@$SERVER_IP${NC}"
-echo -e "  ${YELLOW}Reload your shell${NC} (${DIM}exec \$SHELL -l${NC}) to activate nvm and DOCKER_HOST."
+echo -e "  ${YELLOW}Reload your shell${NC} (${DIM}exec \$SHELL -l${NC}) to activate nvm, DOCKER_HOST, and ~/.local/bin."
 echo -e "  ${DIM}This script is idempotent — re-run anytime to refresh.${NC}"
 echo ""
