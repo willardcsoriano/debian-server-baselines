@@ -83,7 +83,7 @@ Same Docker setup as `prod-server.sh`, plus:
 
 - `nvm` + Node LTS (per-user in `~/.nvm`, `lts/*` aliased default)
 - Corepack enabled — `pnpm`/`yarn` pulled on demand from `package.json#packageManager`
-- Claude Code CLI (`@anthropic-ai/claude-code`, installed via `npm -g` — the only npm-global package on the host)
+- Claude Code CLI (`claude`) — Anthropic's native installer drops a self-updating binary in `~/.local/bin/claude`, decoupled from nvm
 - GitHub CLI (`gh`) from `cli.github.com` apt repo
 - GNU `make` for project-level orchestration
 - Bitwarden CLI (`bw`) — standalone binary from `bitwarden/clients` GitHub releases, installed to `~/.local/bin` (no `npm -g`)

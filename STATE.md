@@ -56,7 +56,7 @@ You already use this same hook pattern in your `claude-config` repo (commit-msg 
 
 6. **Bitwarden CLIs added to `dev-server.sh`** (follow-up session, verified end-to-end on a real Debian 13 host, idempotent on re-run, now on `origin/main`):
    - `c96e2e8` docs: record unpushed bw/bws commit in STATE.md pickup notes
-   - `6931145` feat: add bw and bws to dev-server.sh — adds Bitwarden CLI (`bw`) and Bitwarden Secrets Manager CLI (`bws`) as sections 6/7 and 7/7, both as standalone binaries in `~/.local/bin` (the only install path that fits ENV_STACK's "no `npm -g` except Claude Code" rule and the baseline's mode-750 compilers). `bws` downloads are sha256-verified; `bw` has no equivalent checksum file published. PATH export to `~/.bashrc` is grep-guarded so it appends once.
+   - `6931145` feat: add bw and bws to dev-server.sh — adds Bitwarden CLI (`bw`) and Bitwarden Secrets Manager CLI (`bws`) as sections 6/7 and 7/7, both as standalone binaries in `~/.local/bin` (the only install path that fits ENV_STACK's "no `npm -g`" rule and the baseline's mode-750 compilers). `bws` downloads are sha256-verified; `bw` has no equivalent checksum file published. PATH export to `~/.bashrc` is grep-guarded so it appends once.
 
 ### Context worth preserving (don't re-derive next session)
 

@@ -174,16 +174,32 @@ pass "Corepack enabled"
 
 section "4/7  Claude Code CLI"
 
-# DRIFT: package name and recommended install command may change.
-# Verify before editing:
-#   https://docs.anthropic.com/en/docs/claude-code
-# Last verified: 2026-05-19
+# DRIFT: Anthropic's native installer is the recommended path.  The npm
+# package @anthropic-ai/claude-code still ships but couples claude to a
+# specific nvm-managed Node version — when nvm bumps LTS the global bin
+# is orphaned and claude appears uninstalled.  The native installer
+# drops a self-updating binary in ~/.local/bin/claude, decoupled from
+# Node entirely.  Verify before editing:
+#   https://code.claude.com/docs/en/setup
+# Last verified: 2026-05-22
+
+# Per-user bin dir shared with bw (6/7) and bws (7/7); set up here so
+# claude's install location is on PATH before its idempotency check runs.
+mkdir -p "$HOME/.local/bin"
+if ! grep -q 'HOME/.local/bin' "$HOME/.bashrc" 2>/dev/null; then
+  cat >> "$HOME/.bashrc" <<'EOF'
+
+# Per-user binaries (claude, bw, bws)
+export PATH="$HOME/.local/bin:$PATH"
+EOF
+fi
+export PATH="$HOME/.local/bin:$PATH"
 
 if command -v claude &>/dev/null; then
   CLAUDE_VER=$(claude --version 2>/dev/null | head -1 || echo "installed")
   pass "Claude Code already installed ($CLAUDE_VER)"
 else
-  npm install -g @anthropic-ai/claude-code
+  curl -fsSL https://claude.ai/install.sh | bash
   CLAUDE_VER=$(claude --version 2>/dev/null | head -1 || echo "installed")
   pass "Claude Code CLI installed ($CLAUDE_VER)"
 fi
@@ -240,21 +256,11 @@ section "6/7  Bitwarden CLI (bw)"
 # version visibility.  Verify if release-asset naming changes:
 #   https://bitwarden.com/help/cli/
 #   https://github.com/bitwarden/clients/releases
-# ENV_STACK.md forbids npm -g for anything besides Claude Code, so the
-# standalone binary is the only path that fits.
+# ENV_STACK.md forbids npm -g entirely, so the standalone binary is the
+# only path that fits.
 # Last verified: 2026-05-22
 
-# Per-user binary dir shared with bws (next section); ensure it exists and
-# is on PATH for future shells before either install needs it.
-mkdir -p "$HOME/.local/bin"
-if ! grep -q 'HOME/.local/bin' "$HOME/.bashrc" 2>/dev/null; then
-  cat >> "$HOME/.bashrc" <<'EOF'
-
-# Per-user binaries (bw, bws)
-export PATH="$HOME/.local/bin:$PATH"
-EOF
-fi
-export PATH="$HOME/.local/bin:$PATH"
+# Per-user bin dir and PATH are set up in section 4/7 (shared with claude).
 
 # unzip is required by both bw and bws install steps; apt-get is idempotent.
 sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq unzip
