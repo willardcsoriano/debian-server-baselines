@@ -1,18 +1,13 @@
 # debian-server-baseline
 
-```bash
-curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baseline/main/debian-server-baseline.sh | sudo bash
-```
-
-Run as root on a fresh Debian 13 server. Re-run anytime — the script is idempotent.
-
 ## Overview
 
-Idempotent hardening and role-specific tooling for Debian 13 servers. Every server starts with the mandatory base (`debian-server-baseline.sh`, 20 sections — SSH lockdown, UFW, fail2ban, auditd, AIDE, AppArmor, Lynis, kernel hardening) which runs as root. Then layer one or more role scripts: `prod-server.sh` for container-only hosts (rootless Docker + Compose), `dev-server.sh` for dev boxes (Node/Corepack, Claude Code CLI, `gh`, `make`, Bitwarden), `syslog-baseline.sh` for a central log-receiver host (TCP 514, per-sender log buckets, logrotate), `wireguard-baseline.sh` for encrypted server-to-server tunnels (peer keygen, UFW, idempotent peer management). Each script is a single `curl | bash` one-liner; pick what the server actually needs. All scripts are idempotent — re-run any time to refresh.
+Idempotent hardening and role-specific tooling for Debian 13 servers. Every server starts with the mandatory base (`debian-server-baseline.sh`, 20 sections — SSH lockdown, UFW, fail2ban, auditd, AIDE, AppArmor, Lynis, kernel hardening) run as root. Then layer role scripts for each server's purpose: `prod-server.sh` (rootless Docker + Compose), `dev-server.sh` (Node, Claude Code CLI, `gh`, `make`, Bitwarden), `syslog-baseline.sh` (central log receiver), `wireguard-baseline.sh` (server-to-server encrypted tunnel). All scripts are idempotent — re-run any time to refresh.
 
 ## Table of Contents
 
 - [Overview](#overview)
+- [Setup](#setup)
 - [What the base does](#what-the-base-does)
 - [Requirements](#requirements)
 - [Role scripts](#role-scripts)
@@ -23,6 +18,21 @@ Idempotent hardening and role-specific tooling for Debian 13 servers. Every serv
 - [What happens](#what-happens)
 - [Idempotent — safe to re-run](#idempotent-safe-to-re-run)
 - [After it runs](#after-it-runs)
+
+## Setup
+
+Clone the repo once on your local machine. SCP or clone it onto each server, then run the relevant script directly.
+
+```bash
+git clone git@github.com:willardcsoriano/debian-server-baseline.git
+cd debian-server-baseline
+```
+
+On the server:
+
+```bash
+sudo bash debian-server-baseline.sh
+```
 
 ## What the base does
 
@@ -64,12 +74,12 @@ Most hardening scripts lock your server and disappear. This one installs the too
 
 ## Role scripts
 
-The base hardens any server type. Role scripts layer the tooling each kind of server actually needs. Run them **after** `debian-server-baseline.sh`, as your sudo user (not root).
+The base hardens any server type. Role scripts layer the tooling each kind of server actually needs. Run them **after** `debian-server-baseline.sh`.
 
 ### prod-server.sh — container-only prod hosts
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baseline/main/prod-server.sh | bash
+bash prod-server.sh
 ```
 
 Installs rootless Docker + Compose v2 and nothing else. Disables the system-mode Docker daemon (rootless replaces it), allocates `subuid`/`subgid`, enables linger so the user daemon survives logout, exports `DOCKER_HOST` in `~/.bashrc`. No Node, no language toolchains — apps deploy as container images pulled from a registry. After install: `docker login ghcr.io` (or your registry of choice) and you're ready to `docker compose pull && up -d`.
@@ -77,7 +87,7 @@ Installs rootless Docker + Compose v2 and nothing else. Disables the system-mode
 ### dev-server.sh — developer workstation
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baseline/main/dev-server.sh | bash
+bash dev-server.sh
 ```
 
 Same Docker setup as `prod-server.sh`, plus:
@@ -93,12 +103,12 @@ Same Docker setup as `prod-server.sh`, plus:
 ### syslog-baseline.sh — central log receiver
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baseline/main/syslog-baseline.sh | sudo bash
+sudo bash syslog-baseline.sh
 ```
 
 Turns this host into a central log receiver: enables rsyslog's `imtcp` listener on TCP 514, opens 514/tcp in UFW (optionally restricted to a sender CIDR), and writes each sender's messages to `/var/log/remote/<hostname>/<program>.log` with weekly logrotate (12-week retention, 500M maxsize, compressed). Uses a dedicated `remote-tcp` ruleset with `SecurePath="replace"` so hostile senders can't write outside the bucket. Point the section 20 prompt of `debian-server-baseline.sh` on each sender at this server's IP (or WireGuard overlay IP) and the logs land here automatically.
 
-Prompts for a CIDR to restrict 514/tcp (e.g. `10.20.0.0/24` for a WireGuard subnet). Leave blank to allow all sources. Can also be set via env var for scripted installs:
+Prompts for a CIDR to restrict 514/tcp (e.g. `10.20.0.0/24` for a WireGuard subnet). Leave blank to allow all sources. Can also be set via env var:
 
 ```bash
 SYSLOG_ALLOW_FROM=10.20.0.0/24 sudo bash syslog-baseline.sh
@@ -107,7 +117,7 @@ SYSLOG_ALLOW_FROM=10.20.0.0/24 sudo bash syslog-baseline.sh
 ### wireguard-baseline.sh — server-to-server tunnel
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baseline/main/wireguard-baseline.sh | sudo bash
+sudo bash wireguard-baseline.sh
 ```
 
 Sets up this host as a WireGuard peer: generates a keypair, writes `/etc/wireguard/wg0.conf`, opens the listen port in UFW, and enables `wg-quick@wg0`. On first run prompts for the host's overlay IP (e.g. `10.20.0.1/24`), listen port (default 51820), IP forwarding opt-in, and the first peer's details. Re-run anytime to add more peers or retrieve the public key — the script always prints the public key in the summary so you never have to dig through config files.
@@ -117,7 +127,7 @@ First run:   overlay IP, listen port, IP forwarding opt-in, first peer details
 Re-run:      shows public key, existing peer count, prompts to add another peer
 ```
 
-Run it on both sides of a tunnel, then exchange public keys and peer endpoints between the two. For the Singapore → Helsinki syslog pattern: run `wireguard-baseline.sh` on Helsinki first, note the public key, then run it on Singapore with Helsinki's public key and public IP as the endpoint.
+Run it on both sides of a tunnel, then exchange public keys and peer endpoints between the two. For the Singapore → Helsinki syslog pattern: run on Helsinki first, note the public key, then run on Singapore with Helsinki's public key and public IP as the endpoint.
 
 ## What happens
 
