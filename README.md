@@ -1,36 +1,22 @@
 # debian-server-baseline
 
+## Quick Reference
+
+| Script | Command | Purpose |
+|---|---|---|
+| Base | `sudo bash debian-server-baseline.sh` | SSH, UFW, fail2ban, auditd, AIDE, AppArmor, Lynis — every server first |
+| Prod | `bash prod-server.sh` | Rootless Docker + Compose — container-only prod hosts |
+| Dev | `bash dev-server.sh` | Node, Claude Code CLI, `gh`, `make`, Bitwarden — developer workstation |
+| Syslog | `sudo bash syslog-baseline.sh` | rsyslog TCP 514 receiver, per-sender log buckets — central log host |
+| WireGuard | `sudo bash wireguard-baseline.sh` | WireGuard keypair + peer management — server-to-server tunnel |
+
 ## Overview
 
-Idempotent hardening and role-specific tooling for Debian 13 servers. Every server starts with the mandatory base (`debian-server-baseline.sh`, 20 sections — SSH lockdown, UFW, fail2ban, auditd, AIDE, AppArmor, Lynis, kernel hardening) run as root. Then layer role scripts for each server's purpose. All scripts are idempotent — re-run any time to refresh.
-
-```bash
-sudo bash debian-server-baseline.sh
-```
-SSH lockdown, UFW, fail2ban, auditd, AIDE, AppArmor, Lynis — **run first on every server.**
-
-```bash
-bash prod-server.sh
-```
-Rootless Docker + Compose — container-only prod hosts.
-
-```bash
-bash dev-server.sh
-```
-Node, Claude Code CLI, `gh`, `make`, Bitwarden — developer workstation.
-
-```bash
-sudo bash syslog-baseline.sh
-```
-rsyslog TCP 514 receiver, per-sender log buckets, logrotate — central log host.
-
-```bash
-sudo bash wireguard-baseline.sh
-```
-WireGuard keypair + peer management — server-to-server encrypted tunnel.
+Idempotent hardening and role-specific tooling for Debian 13 servers. Every server starts with the mandatory base (`debian-server-baseline.sh`, 20 sections — SSH lockdown, UFW, fail2ban, auditd, AIDE, AppArmor, Lynis, kernel hardening) run as root. Then layer role scripts for each server's purpose: `prod-server.sh` (rootless Docker + Compose), `dev-server.sh` (Node, Claude Code CLI, `gh`, `make`, Bitwarden), `syslog-baseline.sh` (central log receiver), `wireguard-baseline.sh` (server-to-server encrypted tunnel). All scripts are idempotent — re-run any time to refresh.
 
 ## Table of Contents
 
+- [Quick Reference](#quick-reference)
 - [Overview](#overview)
 - [Setup](#setup)
 - [What the base does](#what-the-base-does)
