@@ -9,19 +9,19 @@ Repo-scoped working notes that supplement [`CLAUDE.md`](CLAUDE.md). `CLAUDE.md` 
 - [Overview](#overview)
 - [Next session pickup](#next-session-pickup)
   - [Open decision: inline vs pre-commit hook for the Docker block](#open-decision-inline-vs-pre-commit-hook-for-the-docker-block)
-  - [Other open items from this session](#other-open-items-from-this-session)
+  - [Other open items](#other-open-items)
   - [Context worth preserving (don't re-derive next session)](#context-worth-preserving-dont-re-derive-next-session)
 - [Open follow-ups](#open-follow-ups)
 
 ## Next session pickup
 
-This block exists so a future session can resume cold. The role-oriented script refactor landed in 7 commits ending `fa3947e`, all on `origin/main`. Repo layout is now: `debian-server-baseline.sh` (base) + `prod-server.sh` + `dev-server.sh` + `syslog-baseline.sh` (log receiver) + `wireguard-baseline.sh` (WireGuard peer). The deleted `remote-syslog.sh` was the redundant sender-side helper — the sender side already lives in baseline section 20.
+This block exists so a future session can resume cold. Current `origin/main` tip: `e735af9` (docs(readme): move quick reference to a table above overview). Repo layout: `debian-server-baseline.sh` (base) + `prod-server.sh` + `dev-server.sh` + `syslog-baseline.sh` (log receiver) + `wireguard-baseline.sh` (WireGuard peer). Docs live under `docs/`. Install model is **git clone + bash** (private repo — curl|bash was dropped in `cd225c4`).
 
 ### Open decision: inline vs pre-commit hook for the Docker block
 
 The rootless Docker install (~70 lines) is currently **inlined and duplicated** between `prod-server.sh` (section 1/1) and `dev-server.sh` (section 1/5). `DRIFTCHECK.md` § 1 is the (manual) sync mechanism; `CLAUDE.md` editing guardrails require lockstep edits.
 
-A `lib/docker-rootless.sh` was tried mid-refactor and reverted before commit, because the install model is **one curl URL per script, no clone, no build step** (saved as `install-model-curl-bash.md` in `.claude` memory). That constraint rules out a *local* `lib/`; it does **not** rule out reproducibility.
+A `lib/docker-rootless.sh` was tried mid-refactor and reverted before commit. The install model has since changed to **git clone + bash** (private repo), but the self-containment rule still stands: each script must run individually without depending on siblings. That rules out a `source ./lib/…` approach; it does **not** rule out reproducibility.
 
 The parked proposal that would give mechanical reproducibility without giving up the one-liner install:
 
@@ -35,33 +35,18 @@ You already use this same hook pattern in your `claude-config` repo (commit-msg 
 
 **Decision pending.** "Inline as-is" and "add the hook" are both defensible. Lean in fresh and pick.
 
-### Other open items from this session
+### Other open items
 
-1. **GitHub repo rename: `debian-baseline` → `debian-server-baseline`** (UI action, not in this checkout). Until done, the `raw.githubusercontent.com/.../debian-server-baseline/...` URLs in `README.md` 404. GitHub auto-redirects the *repo* URL for clones and web; raw content URLs do **not** redirect after rename because both the path and the filename changed. Plan to do this right after pushing the 5 unpushed commits.
+1. **`shellcheck` was not run** in the session that added `wireguard-baseline.sh` and updated `syslog-baseline.sh`. The dev host didn't have it installed. All scripts pass `bash -n`. Full static analysis: `sudo apt install -y shellcheck`, then run the lint block in `CLAUDE.md` § "Working with the scripts".
 
-2. **`shellcheck` was not run.** `shellcheck` isn't installed on the dev host this session ran from. All four scripts pass `bash -n` syntax check. If you want full static analysis: `sudo apt install -y shellcheck`, then run the lint block in `CLAUDE.md` § "Working with the scripts".
+2. **Pre-existing broken link.** `DRIFTCHECK.md` § Overview references a `DRIFT.md` ("General drift methodology lives in `DRIFT.md`") that doesn't exist in the repo. Either create it, drop the reference, or repoint it.
 
-3. **Syslog scripts consolidated.** `remote-syslog.sh` was deleted — it duplicated baseline section 20 (sender side) with no features section 20 couldn't absorb, so it failed the extraction-threshold rule in CLAUDE.md. `syslog-baseline.sh` (receiver side) stays; it is the only file that sets up an `imtcp` listener, log buckets, and the matching UFW/logrotate. Future receiver-side feature work (TLS/relp, multi-receiver, schema rewrites) lands in `syslog-baseline.sh`.
-
-4. **Pre-existing broken link (not from this refactor).** `DRIFTCHECK.md` § Overview references a `DRIFT.md` ("General drift methodology lives in `DRIFT.md`") that doesn't exist in the repo. Either create it, drop the reference, or repoint it — your call.
-
-5. **Commits landed on `origin/main`** (most-recent first):
-   - `fa3947e` docs: add next-session pickup notes to STATE.md
-   - `0665490` docs: add ENV_STACK.md
-   - `5dd0674` docs: align README/WALKTHROUGH/CLAUDE/STATE/DRIFTCHECK for role-oriented layout
-   - `c044f6b` chore: sync stale baseline.sh references in syslog-baseline.sh
-   - `091ee44` refactor: rename dev-baseline.sh → dev-server.sh
-   - `30ea6f2` feat: add prod-server.sh for container-only prod hosts
-   - `c06806e` chore: rename baseline.sh → debian-server-baseline.sh
-
-6. **Bitwarden CLIs added to `dev-server.sh`** (follow-up session, verified end-to-end on a real Debian 13 host, idempotent on re-run, now on `origin/main`):
-   - `c96e2e8` docs: record unpushed bw/bws commit in STATE.md pickup notes
-   - `6931145` feat: add bw and bws to dev-server.sh — adds Bitwarden CLI (`bw`) and Bitwarden Secrets Manager CLI (`bws`) as sections 6/7 and 7/7, both as standalone binaries in `~/.local/bin` (the only install path that fits ENV_STACK's "no `npm -g`" rule and the baseline's mode-750 compilers). `bws` downloads are sha256-verified; `bw` has no equivalent checksum file published. PATH export to `~/.bashrc` is grep-guarded so it appends once.
+3. **GitHub vs GitLab: stay on GitHub.** Discussed in session ending `e735af9`. The "not doing well" content (AI training controversy, Microsoft ownership) doesn't affect a private repo. No action required; revisit only if pricing or a concrete incident changes the calculus.
 
 ### Context worth preserving (don't re-derive next session)
 
 - **Why role-oriented and not tool-oriented:** we picked role scripts (`prod-server.sh`, `dev-server.sh`) over factoring tools (`docker.sh`, `node.sh`, ...) because the user-side mental model is "what kind of server am I spinning up?", not "which tools do I want?". A maintainer's DRY win wasn't worth a user's clarity loss.
-- **Why curl|bash is non-negotiable:** see `~/.claude/projects/-home-willard-repos-debian-baseline/memory/install-model-curl-bash.md`. Every install is one curl URL per script. Don't propose clone-first, `lib/`-local, or build/bundle steps without flagging the constraint explicitly first.
+- **Install model is git clone + bash (private repo):** curl|bash was dropped when the repo went private (`cd225c4`). Scripts are still individually self-contained — no `source ./lib/…`, no runtime curl of siblings — but there are no public one-liner URLs. See `~/.claude/projects/-home-willard-repos-debian-baseline/memory/install-model-curl-bash.md`.
 - **Why `remote-syslog.sh` was deleted** (vs left dormant): it functionally duplicated baseline section 20 with no growth path the section couldn't absorb, which is the extraction-threshold violation called out in CLAUDE.md ("an extracted file that mirrors the in-baseline section is churn, not signal"). The sender side stays in section 20 forever; the only file that earns its own slot is the receiver (`syslog-baseline.sh`), which is qualitatively different work.
 
 ## Open follow-ups
