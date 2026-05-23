@@ -97,10 +97,10 @@ Run these locally — they catch internal drift without network calls:
 
 ```bash
 # Syntax
-bash -n debian-server-baseline.sh prod-server.sh dev-server.sh remote-syslog.sh
+bash -n debian-server-baseline.sh prod-server.sh dev-server.sh syslog-baseline.sh wireguard-baseline.sh
 
 # Static analysis
-shellcheck debian-server-baseline.sh prod-server.sh dev-server.sh remote-syslog.sh
+shellcheck debian-server-baseline.sh prod-server.sh dev-server.sh syslog-baseline.sh wireguard-baseline.sh
 
 # Base script section count (should still be 20)
 grep -c 'section "' debian-server-baseline.sh

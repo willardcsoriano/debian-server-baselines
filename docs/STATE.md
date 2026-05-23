@@ -15,7 +15,7 @@ Repo-scoped working notes that supplement [`CLAUDE.md`](CLAUDE.md). `CLAUDE.md` 
 
 ## Next session pickup
 
-This block exists so a future session can resume cold. The role-oriented script refactor landed in 7 commits ending `fa3947e`, all on `origin/main`. Repo layout is now: `debian-server-baseline.sh` (base) + `prod-server.sh` + `dev-server.sh` + `remote-syslog.sh` + `syslog-baseline.sh` (draft).
+This block exists so a future session can resume cold. The role-oriented script refactor landed in 7 commits ending `fa3947e`, all on `origin/main`. Repo layout is now: `debian-server-baseline.sh` (base) + `prod-server.sh` + `dev-server.sh` + `syslog-baseline.sh` (log receiver) + `wireguard-baseline.sh` (WireGuard peer). The deleted `remote-syslog.sh` was the redundant sender-side helper — the sender side already lives in baseline section 20.
 
 ### Open decision: inline vs pre-commit hook for the Docker block
 
@@ -41,7 +41,7 @@ You already use this same hook pattern in your `claude-config` repo (commit-msg 
 
 2. **`shellcheck` was not run.** `shellcheck` isn't installed on the dev host this session ran from. All four scripts pass `bash -n` syntax check. If you want full static analysis: `sudo apt install -y shellcheck`, then run the lint block in `CLAUDE.md` § "Working with the scripts".
 
-3. **Syslog work is fully deferred per your call.** `syslog-baseline.sh` (the receiver-side draft) is still in the repo with its string refs synced to the new names (commit `c044f6b`). The actual rename to `syslog-server.sh` plus any content/feature work — TLS/relp, multi-receiver, schema rewrites, etc. — happens in its own session. Same with `remote-syslog.sh`: per the policy below, it stays as the dormant extracted forwarder until it grows features the in-baseline section 20 can't absorb.
+3. **Syslog scripts consolidated.** `remote-syslog.sh` was deleted — it duplicated baseline section 20 (sender side) with no features section 20 couldn't absorb, so it failed the extraction-threshold rule in CLAUDE.md. `syslog-baseline.sh` (receiver side) stays; it is the only file that sets up an `imtcp` listener, log buckets, and the matching UFW/logrotate. Future receiver-side feature work (TLS/relp, multi-receiver, schema rewrites) lands in `syslog-baseline.sh`.
 
 4. **Pre-existing broken link (not from this refactor).** `DRIFTCHECK.md` § Overview references a `DRIFT.md` ("General drift methodology lives in `DRIFT.md`") that doesn't exist in the repo. Either create it, drop the reference, or repoint it — your call.
 
@@ -62,7 +62,7 @@ You already use this same hook pattern in your `claude-config` repo (commit-msg 
 
 - **Why role-oriented and not tool-oriented:** we picked role scripts (`prod-server.sh`, `dev-server.sh`) over factoring tools (`docker.sh`, `node.sh`, ...) because the user-side mental model is "what kind of server am I spinning up?", not "which tools do I want?". A maintainer's DRY win wasn't worth a user's clarity loss.
 - **Why curl|bash is non-negotiable:** see `~/.claude/projects/-home-willard-repos-debian-baseline/memory/install-model-curl-bash.md`. Every install is one curl URL per script. Don't propose clone-first, `lib/`-local, or build/bundle steps without flagging the constraint explicitly first.
-- **Why `remote-syslog.sh` stays dormant** even though it now appears in README: it duplicates baseline section 20 today; surface as a *primary* role only once it grows features the in-baseline section can't absorb. Documenting it as "an optional log-forwarding helper" in README is the minimum disclosure, not promotion to primary role.
+- **Why `remote-syslog.sh` was deleted** (vs left dormant): it functionally duplicated baseline section 20 with no growth path the section couldn't absorb, which is the extraction-threshold violation called out in CLAUDE.md ("an extracted file that mirrors the in-baseline section is churn, not signal"). The sender side stays in section 20 forever; the only file that earns its own slot is the receiver (`syslog-baseline.sh`), which is qualitatively different work.
 
 ## Open follow-ups
 
