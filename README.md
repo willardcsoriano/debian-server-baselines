@@ -2,7 +2,18 @@
 
 ## Overview
 
-Idempotent hardening and role-specific tooling for Debian 13 servers. Every server starts with the mandatory base (`debian-server-baseline.sh`, 20 sections — SSH lockdown, UFW, fail2ban, auditd, AIDE, AppArmor, Lynis, kernel hardening) run as root. Then layer role scripts for each server's purpose: `prod-server.sh` (rootless Docker + Compose), `dev-server.sh` (Node, Claude Code CLI, `gh`, `make`, Bitwarden), `syslog-baseline.sh` (central log receiver), `wireguard-baseline.sh` (server-to-server encrypted tunnel). All scripts are idempotent — re-run any time to refresh.
+Idempotent hardening and role-specific tooling for Debian 13 servers. Every server starts with the mandatory base (`debian-server-baseline.sh`, 20 sections — SSH lockdown, UFW, fail2ban, auditd, AIDE, AppArmor, Lynis, kernel hardening) run as root. Then layer role scripts for each server's purpose. All scripts are idempotent — re-run any time to refresh.
+
+```bash
+# ── Base (every server, run as root) ──────────────────────────────────────────
+sudo bash debian-server-baseline.sh       # hardening: SSH, UFW, fail2ban, auditd, AIDE, Lynis
+
+# ── Role scripts (run after base) ─────────────────────────────────────────────
+bash prod-server.sh                       # container-only prod host — rootless Docker + Compose
+bash dev-server.sh                        # dev workstation — Node, Claude Code, gh, make, Bitwarden
+sudo bash syslog-baseline.sh              # central log receiver — rsyslog TCP 514, per-host buckets
+sudo bash wireguard-baseline.sh           # server-to-server tunnel — WireGuard peer + key management
+```
 
 ## Table of Contents
 
