@@ -40,7 +40,30 @@ systemctl is-active --quiet ufw \
 command -v rsyslogd &>/dev/null \
   || fail "rsyslogd not found — install rsyslog and re-run."
 
+RERUN=0
+if [[ -f /etc/rsyslog.d/50-receiver.conf ]]; then
+  RERUN=1
+  note "Re-run detected — config will be refreshed"
+fi
+
 pass "Preflight OK"
+echo ""
+
+# ─── Sender CIDR ──────────────────────────────────────────────────────────────
+
+# SYSLOG_ALLOW_FROM can be set in the environment to skip the prompt, which is
+# useful when running via curl | bash with a WireGuard or private-network CIDR:
+#   SYSLOG_ALLOW_FROM=10.20.0.0/24 sudo bash syslog-baseline.sh
+if [[ -z "${SYSLOG_ALLOW_FROM:-}" ]]; then
+  [[ -t 0 || -r /dev/tty ]] || fail "No tty — set SYSLOG_ALLOW_FROM=<cidr> in the environment or run interactively."
+  read -rp "  Restrict 514/tcp to CIDR (e.g. 10.20.0.0/24, blank = allow all): " SYSLOG_ALLOW_FROM </dev/tty
+  SYSLOG_ALLOW_FROM="${SYSLOG_ALLOW_FROM// /}"
+fi
+if [[ -z "$SYSLOG_ALLOW_FROM" ]]; then
+  warn "No CIDR — 514/tcp will be open to all sources (not recommended on a public IP)"
+else
+  note "514/tcp restricted to $SYSLOG_ALLOW_FROM"
+fi
 echo ""
 
 # ─── 1/3  rsyslog receiver ────────────────────────────────────────────────────
@@ -78,7 +101,10 @@ ruleset(name="remote-tcp") {
   )
 }
 
-input(type="imtcp" port="514" ruleset="remote-tcp")
+# KeepAlive detects dead TCP connections from senders that crashed or rebooted
+# without sending FIN, so rsyslog reaps the half-open socket rather than waiting
+# indefinitely.
+input(type="imtcp" port="514" ruleset="remote-tcp" KeepAlive="on")
 EOF
 
 rsyslogd -N1 || fail "rsyslog config invalid — fix /etc/rsyslog.d/50-receiver.conf"
@@ -89,10 +115,15 @@ pass "rsyslog receiving on TCP 514 — /var/log/remote/<hostname>/<program>.log"
 
 section "2/3  Firewall (UFW 514/tcp)"
 
-# debian-server-baseline.sh's sender side (section 20) forwards over TCP (@@).  Only TCP
-# is opened here — UDP syslog is fire-and-forget with no delivery guarantee.
-ufw allow 514/tcp > /dev/null
-pass "UFW: 514/tcp open"
+# sender side (debian-server-baseline.sh section 20) forwards over TCP (@@).
+# Only TCP is opened here — UDP syslog is fire-and-forget with no delivery guarantee.
+if [[ -n "$SYSLOG_ALLOW_FROM" ]]; then
+  ufw allow from "$SYSLOG_ALLOW_FROM" to any port 514 proto tcp > /dev/null
+  pass "UFW: 514/tcp open from $SYSLOG_ALLOW_FROM only"
+else
+  ufw allow 514/tcp > /dev/null
+  pass "UFW: 514/tcp open (all sources)"
+fi
 
 # ─── 3/3  Log rotation ────────────────────────────────────────────────────────
 
@@ -103,6 +134,7 @@ cat > /etc/logrotate.d/remote-syslog <<'EOF'
 /var/log/remote/*/*.log {
     weekly
     rotate 12
+    maxsize 500M
     compress
     delaycompress
     missingok
@@ -114,7 +146,7 @@ cat > /etc/logrotate.d/remote-syslog <<'EOF'
 }
 EOF
 
-pass "logrotate: weekly rotation, 12-week retention, compressed"
+pass "logrotate: weekly rotation, 12-week retention, 500M maxsize, compressed"
 
 # ─── Summary ─────────────────────────────────────────────────────────────────
 
@@ -125,10 +157,15 @@ echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 echo -e "  ${GREEN}✓${NC} rsyslog: receiving on TCP 514"
 echo -e "  ${GREEN}✓${NC} Logs: /var/log/remote/<hostname>/<program>.log"
-echo -e "  ${GREEN}✓${NC} UFW: 514/tcp open"
-echo -e "  ${GREEN}✓${NC} logrotate: weekly, 12-week retention, compressed"
+if [[ -n "$SYSLOG_ALLOW_FROM" ]]; then
+  echo -e "  ${GREEN}✓${NC} UFW: 514/tcp open from ${BOLD}$SYSLOG_ALLOW_FROM${NC} only"
+else
+  echo -e "  ${YELLOW}⚠${NC} UFW: 514/tcp open to all sources"
+fi
+echo -e "  ${GREEN}✓${NC} logrotate: weekly, 12-week retention, 500M maxsize, compressed"
 echo ""
 echo -e "  Point senders at: ${BOLD}$SERVER_IP:514${NC}"
+echo -e "  ${DIM}(If using WireGuard, use this host's WireGuard IP instead of the above.)${NC}"
 echo -e "  On each sender, answer the remote syslog prompt in debian-server-baseline.sh"
 echo -e "  or set it manually in /etc/rsyslog.d/50-remote-syslog.conf."
 echo -e "  ${DIM}This script is idempotent — re-run anytime to refresh.${NC}"
