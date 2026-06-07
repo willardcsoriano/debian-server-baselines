@@ -110,6 +110,7 @@ Same Docker setup as `prod-server.sh`, plus:
 - GNU `make` for project-level orchestration
 - Bitwarden CLI (`bw`) — standalone binary from `bitwarden/clients` GitHub releases, installed to `~/.local/bin` (no `npm -g`)
 - Bitwarden Secrets Manager CLI (`bws`) — standalone binary from `bitwarden/sdk-sm` GitHub releases, sha256-verified, installed to `~/.local/bin`
+- Gemini CLI (`gemini`) — bundle from `google-gemini/gemini-cli` GitHub releases, extracted to `~/.local/lib/gemini-cli` with a launcher in `~/.local/bin` (no `npm -g`; runs on the nvm Node ≥ 20)
 
 ### syslog-baseline.sh — central log receiver
 
