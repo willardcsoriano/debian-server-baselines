@@ -35,14 +35,14 @@ Idempotent hardening and role-specific tooling for Debian 13 servers. Every serv
 **Public repo — run directly on the server:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-baseline/main/debian-server-baseline.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baselines/main/debian-server-baseline.sh | sudo bash
 ```
 
 **Private repo — clone and run locally:**
 
 ```bash
-git clone git@github.com:willardcsoriano/debian-baseline.git
-cd debian-baseline
+git clone git@github.com:willardcsoriano/debian-server-baselines.git
+cd debian-server-baselines
 ```
 
 Then on the server:
