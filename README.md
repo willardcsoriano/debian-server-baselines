@@ -1,10 +1,10 @@
-# debian-server-baseline
+# debian-server-baselines
 
 ## Quick Reference
 
 | Script | Command | Purpose |
 |---|---|---|
-| Base | `sudo bash debian-server-baseline.sh` | SSH, UFW, fail2ban, auditd, AIDE, AppArmor, Lynis — every server first |
+| Base | `sudo bash base-server.sh` | SSH, UFW, fail2ban, auditd, AIDE, AppArmor, Lynis — every server first |
 | Prod | `bash prod-server.sh` | Rootless Docker + Compose — container-only prod hosts |
 | Dev | `bash dev-server.sh` | Node, Claude Code CLI, `gh`, `make`, Bitwarden — developer workstation |
 | Syslog | `sudo bash syslog-baseline.sh` | rsyslog TCP 514 receiver, per-sender log buckets — central log host |
@@ -12,7 +12,7 @@
 
 ## Overview
 
-Idempotent hardening and role-specific tooling for Debian 13 servers. Every server starts with the mandatory base (`debian-server-baseline.sh`, 20 sections — SSH lockdown, UFW, fail2ban, auditd, AIDE, AppArmor, Lynis, kernel hardening) run as root. Then layer role scripts for each server's purpose: `prod-server.sh` (rootless Docker + Compose), `dev-server.sh` (Node, Claude Code CLI, `gh`, `make`, Bitwarden), `syslog-baseline.sh` (central log receiver), `wireguard-baseline.sh` (server-to-server encrypted tunnel). All scripts are idempotent — re-run any time to refresh.
+Idempotent hardening and role-specific tooling for Debian 13 servers. Every server starts with the mandatory base (`base-server.sh`, 20 sections — SSH lockdown, UFW, fail2ban, auditd, AIDE, AppArmor, Lynis, kernel hardening) run as root. Then layer role scripts for each server's purpose: `prod-server.sh` (rootless Docker + Compose), `dev-server.sh` (Node, Claude Code CLI, `gh`, `make`, Bitwarden), `syslog-baseline.sh` (central log receiver), `wireguard-baseline.sh` (server-to-server encrypted tunnel). All scripts are idempotent — re-run any time to refresh.
 
 ## Table of Contents
 
@@ -35,14 +35,14 @@ Idempotent hardening and role-specific tooling for Debian 13 servers. Every serv
 Clone the repo once on your local machine. SCP or clone it onto each server, then run the relevant script directly.
 
 ```bash
-git clone git@github.com:willardcsoriano/debian-server-baseline.git
-cd debian-server-baseline
+git clone git@github.com:willardcsoriano/debian-server-baselines.git
+cd debian-server-baselines
 ```
 
 On the server:
 
 ```bash
-sudo bash debian-server-baseline.sh
+sudo bash base-server.sh
 ```
 
 ## What the base does
@@ -85,7 +85,7 @@ Most hardening scripts lock your server and disappear. This one installs the too
 
 ## Role scripts
 
-The base hardens any server type. Role scripts layer the tooling each kind of server actually needs. Run them **after** `debian-server-baseline.sh`.
+The base hardens any server type. Role scripts layer the tooling each kind of server actually needs. Run them **after** `base-server.sh`.
 
 ### prod-server.sh — container-only prod hosts
 
@@ -118,7 +118,7 @@ Same Docker setup as `prod-server.sh`, plus:
 sudo bash syslog-baseline.sh
 ```
 
-Turns this host into a central log receiver: enables rsyslog's `imtcp` listener on TCP 514, opens 514/tcp in UFW (optionally restricted to a sender CIDR), and writes each sender's messages to `/var/log/remote/<hostname>/<program>.log` with weekly logrotate (12-week retention, 500M maxsize, compressed). Uses a dedicated `remote-tcp` ruleset with `SecurePath="replace"` so hostile senders can't write outside the bucket. Point the section 20 prompt of `debian-server-baseline.sh` on each sender at this server's IP (or WireGuard overlay IP) and the logs land here automatically.
+Turns this host into a central log receiver: enables rsyslog's `imtcp` listener on TCP 514, opens 514/tcp in UFW (optionally restricted to a sender CIDR), and writes each sender's messages to `/var/log/remote/<hostname>/<program>.log` with weekly logrotate (12-week retention, 500M maxsize, compressed). Uses a dedicated `remote-tcp` ruleset with `SecurePath="replace"` so hostile senders can't write outside the bucket. Point the section 20 prompt of `base-server.sh` on each sender at this server's IP (or WireGuard overlay IP) and the logs land here automatically.
 
 Prompts for a CIDR to restrict 514/tcp (e.g. `10.20.0.0/24` for a WireGuard subnet). Leave blank to allow all sources. Can also be set via env var:
 
@@ -143,7 +143,7 @@ Run it on both sides of a tunnel, then exchange public keys and peer endpoints b
 
 ## What happens
 
-`debian-server-baseline.sh` asks for your sudo username on first run (pre-filled on re-runs) and a sudo password for that user. Everything else is automatic.
+`base-server.sh` asks for your sudo username on first run (pre-filled on re-runs) and a sudo password for that user. Everything else is automatic.
 
 One pause on first run: before locking down SSH, it asks you to verify your new account works in a second terminal. This prevents lockouts. Re-runs skip this pause automatically.
 

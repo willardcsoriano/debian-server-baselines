@@ -2,15 +2,15 @@
 
 ## Overview
 
-Project-specific drift runbook for `debian-server-baseline`. Run this whenever you return to the repo after an absence, or when asked to touch any install section. It covers the four components most likely to have changed: Docker (lives in **two** role scripts now — see Section 1), Netdata, Lynis, and the Debian target version. For each one, fetch the canonical URL, compare against the current script, and report any discrepancies before making changes. General drift methodology lives in `DRIFT.md`; this file is the executable checklist for this repo specifically.
+Project-specific drift runbook for `base-server`. Run this whenever you return to the repo after an absence, or when asked to touch any install section. It covers the four components most likely to have changed: Docker (lives in **two** role scripts now — see Section 1), Netdata, Lynis, and the Debian target version. For each one, fetch the canonical URL, compare against the current script, and report any discrepancies before making changes. General drift methodology lives in `DRIFT.md`; this file is the executable checklist for this repo specifically.
 
 ## Table of Contents
 
 - [Overview](#overview)
 - [How to invoke](#how-to-invoke)
 - [1. Docker (prod-server.sh + dev-server.sh, both section 1) — High risk](#1-docker-prod-serversh-dev-serversh-both-section-1-high-risk)
-- [2. Netdata (debian-server-baseline.sh, section 11) — Medium risk](#2-netdata-debian-server-baselinesh-section-11-medium-risk)
-- [3. Lynis (debian-server-baseline.sh, section 18) — Medium risk](#3-lynis-debian-server-baselinesh-section-18-medium-risk)
+- [2. Netdata (base-server.sh, section 11) — Medium risk](#2-netdata-base-serversh-section-11-medium-risk)
+- [3. Lynis (base-server.sh, section 18) — Medium risk](#3-lynis-base-serversh-section-18-medium-risk)
 - [4. Debian target version — Medium risk](#4-debian-target-version-medium-risk)
 - [5. Gemini CLI (dev-server.sh, section 8) — Medium risk](#5-gemini-cli-dev-serversh-section-8-medium-risk)
 - [6. Quick sanity checks (no fetch required)](#6-quick-sanity-checks-no-fetch-required)
@@ -43,14 +43,14 @@ Tell the agent: `check @DRIFTCHECK.md` or `run the drift check`. The agent fetch
 
 ---
 
-## 2. Netdata (debian-server-baseline.sh, section 11) — Medium risk
+## 2. Netdata (base-server.sh, section 11) — Medium risk
 
 **Why:** The kickstart script URL and its flags have changed before. `--dont-wait` and `--noupdate` were renamed; the current flags are `--non-interactive --no-updates --disable-telemetry`.
 
 **Fetch:**
 - https://learn.netdata.cloud/docs/netdata-agent/installation/linux
 
-**Check against `debian-server-baseline.sh` section 11:**
+**Check against `base-server.sh` section 11:**
 - Kickstart URL (`https://get.netdata.cloud/kickstart.sh` — note: NOT `my-netdata.io`, which 307-redirects)
 - Current flag names for non-interactive, no-updates, disable-telemetry
 - Whether the install path `/opt/netdata/bin/netdata` is still correct for skip-detection
@@ -59,14 +59,14 @@ Tell the agent: `check @DRIFTCHECK.md` or `run the drift check`. The agent fetch
 
 ---
 
-## 3. Lynis (debian-server-baseline.sh, section 18) — Medium risk
+## 3. Lynis (base-server.sh, section 18) — Medium risk
 
 **Why:** CISOfy controls the apt repo; the GPG key URL and sources format could change.
 
 **Fetch:**
 - https://packages.cisofy.com/community/lynis/deb/
 
-**Check against `debian-server-baseline.sh` section 18:**
+**Check against `base-server.sh` section 18:**
 - GPG key URL (`https://packages.cisofy.com/keys/cisofy-software-public.key`)
 - Sources list entry (`https://packages.cisofy.com/community/lynis/deb/ stable main`)
 - Whether `lynis audit system --quiet --nocolors` flags are still current
@@ -116,21 +116,21 @@ Run these locally — they catch internal drift without network calls:
 
 ```bash
 # Syntax
-bash -n debian-server-baseline.sh prod-server.sh dev-server.sh syslog-baseline.sh wireguard-baseline.sh
+bash -n base-server.sh prod-server.sh dev-server.sh syslog-baseline.sh wireguard-baseline.sh
 
 # Static analysis
-shellcheck debian-server-baseline.sh prod-server.sh dev-server.sh syslog-baseline.sh wireguard-baseline.sh
+shellcheck base-server.sh prod-server.sh dev-server.sh syslog-baseline.sh wireguard-baseline.sh
 
 # Base script section count (should still be 20)
-grep -c 'section "' debian-server-baseline.sh
-grep -oP '\d+(?=/)' debian-server-baseline.sh | sort -n | uniq | tail -1   # highest N in N/20
+grep -c 'section "' base-server.sh
+grep -oP '\d+(?=/)' base-server.sh | sort -n | uniq | tail -1   # highest N in N/20
 
 # dev-server section count (should still be 8)
 grep -c 'section "' dev-server.sh
 grep -oP '\d+(?=/8)' dev-server.sh | sort -n | uniq | tail -1              # highest N in N/8
 
 # Summary block matches section count
-grep -c '✓\|✗\|–' debian-server-baseline.sh | tail -1
+grep -c '✓\|✗\|–' base-server.sh | tail -1
 ```
 
 ---

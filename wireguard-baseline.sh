@@ -16,7 +16,7 @@ note()    { echo -e "  ${DIM}$1${NC}"; }
 
 clear
 echo -e "${BOLD}wireguard-baseline${NC}"
-echo -e "${DIM}WireGuard peer — run as root, after debian-server-baseline${NC}"
+echo -e "${DIM}WireGuard peer — run as root, after base-server${NC}"
 echo ""
 
 [[ $EUID -ne 0 ]] && fail "Must run as root (or via sudo)."
@@ -30,9 +30,9 @@ SERVER_IP=$(hostname -I | awk '{print $1}')
 pass "Debian $VERSION_ID ($VERSION_CODENAME) on $SERVER_IP"
 
 grep -q "^PermitRootLogin no" /etc/ssh/sshd_config 2>/dev/null \
-  || fail "debian-server-baseline.sh has not run on this host (PermitRootLogin still on)."
+  || fail "base-server.sh has not run on this host (PermitRootLogin still on)."
 systemctl is-active --quiet ufw \
-  || fail "debian-server-baseline.sh has not run on this host (UFW not active)."
+  || fail "base-server.sh has not run on this host (UFW not active)."
 
 WG_CONF="/etc/wireguard/wg0.conf"
 WG_PUB="/etc/wireguard/publickey"

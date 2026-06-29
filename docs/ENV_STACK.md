@@ -2,7 +2,7 @@
 
 ## Overview
 
-My personal default tech stack across all projects. Captures the host-level baseline (`debian-server-baseline.sh` hardening + `prod-server.sh` / `dev-server.sh` role layers), the tooling I reach for first on top of that baseline (rootless Docker, corepack-managed pnpm, language-managed toolchains in `$HOME`), the network access pattern (SSH tunnels for everything beyond 22/80/443), the editor connection model (VSCode Remote-SSH-style multiplexing), the deployment target (my own prod server, never managed PaaS), and the git forge (GitHub via `gh`). Exists primarily as a checkpoint AI assistants can read so they don't suggest rootful Docker, `npm install -g`, or PaaS-flavored defaults that don't match this environment. Update when defaults change; keep terse.
+My personal default tech stack across all projects. Captures the host-level baseline (`base-server.sh` hardening + `prod-server.sh` / `dev-server.sh` role layers), the tooling I reach for first on top of that baseline (rootless Docker, corepack-managed pnpm, language-managed toolchains in `$HOME`), the network access pattern (SSH tunnels for everything beyond 22/80/443), the editor connection model (VSCode Remote-SSH-style multiplexing), the deployment target (my own prod server, never managed PaaS), and the git forge (GitHub via `gh`). Exists primarily as a checkpoint AI assistants can read so they don't suggest rootful Docker, `npm install -g`, or PaaS-flavored defaults that don't match this environment. Update when defaults change; keep terse.
 
 ---
 
@@ -11,7 +11,7 @@ My personal default tech stack across all projects. Captures the host-level base
 - [Overview](#overview)
 - [Defaults](#defaults)
 - [Dev tooling (from dev-server.sh)](#dev-tooling-from-dev-serversh)
-- [Hardening (from debian-server-baseline.sh)](#hardening-from-debian-server-baselinesh)
+- [Hardening (from base-server.sh)](#hardening-from-base-serversh)
 
 ## Defaults
 
@@ -27,7 +27,7 @@ My personal default tech stack across all projects. Captures the host-level base
 
 ## Dev tooling (from dev-server.sh)
 
-`dev-server.sh` (8 sections, run as the sudo user after `debian-server-baseline.sh`) installs the per-user dev stack. Inventory and the things that surprise:
+`dev-server.sh` (8 sections, run as the sudo user after `base-server.sh`) installs the per-user dev stack. Inventory and the things that surprise:
 
 - **Docker rootless + Compose v2.** Packages: `docker-ce`, `docker-ce-cli`, `containerd.io`, `docker-buildx-plugin`, `docker-compose-plugin`, `docker-ce-rootless-extras`, `uidmap`. System-mode daemon disabled. Setup via `dockerd-rootless-setuptool.sh install`, then `systemctl --user enable --now docker` + `loginctl enable-linger $USER` so the daemon survives logout. `subuid`/`subgid` allocated `100000-165535`. `DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock` is exported in `~/.bashrc`. **Gotcha:** the daemon needs a live user dbus at `/run/user/<uid>/bus` — log in via SSH (real PAM session). `sudo -s` / `su <user>` does not give you one, and the role scripts (`prod-server.sh`, `dev-server.sh`) refuse to run without it. The install logic is identical to `prod-server.sh`; only `dev-server.sh` then layers the rest below.
 - **Node via nvm.** `nvm` installed to `~/.nvm`; Node LTS installed and `lts/*` is the default alias. `nvm` init lines are appended to `~/.bashrc` by its installer. After install, `exec $SHELL -l` to pick up `nvm` and `DOCKER_HOST` in the current shell.
@@ -38,13 +38,13 @@ My personal default tech stack across all projects. Captures the host-level base
 - **Bitwarden CLI (`bw`)** and **Secrets Manager CLI (`bws`)** — standalone binaries from `bitwarden/clients` / `bitwarden/sdk-sm` GitHub releases, dropped into `~/.local/bin` (`bws` is sha256-verified). Not `npm -g` (banned) and not `cargo install` (host compilers are root-only per the baseline).
 - **Gemini CLI (`gemini`)** — unlike `claude`, Google ships **no** native binary; `@google/gemini-cli` is npm-only. We install the `gemini-cli-bundle.zip` from `google-gemini/gemini-cli` GitHub releases — a multi-file, code-split ESM bundle (no shebang) — into `~/.local/lib/gemini-cli`, with a thin launcher in `~/.local/bin` that runs `node bundle/gemini.js`. **Node-dependent** (needs the nvm Node ≥ 20), not standalone — the one tool here that isn't decoupled from the toolchain.
 
-Re-runnable: `dev-server.sh` is idempotent. Preflight refuses to run as root, refuses if `debian-server-baseline.sh` hasn't run (checks `PermitRootLogin no` + UFW active), and refuses without a live user session.
+Re-runnable: `dev-server.sh` is idempotent. Preflight refuses to run as root, refuses if `base-server.sh` hasn't run (checks `PermitRootLogin no` + UFW active), and refuses without a live user session.
 
 ---
 
-## Hardening (from debian-server-baseline.sh)
+## Hardening (from base-server.sh)
 
-Every host has run `debian-server-baseline.sh` (Debian 13 + 20 hardening sections). The defaults above already capture the network surface (UFW 22/80/443 only). The rest of what bites if assumed away:
+Every host has run `base-server.sh` (Debian 13 + 20 hardening sections). The defaults above already capture the network surface (UFW 22/80/443 only). The rest of what bites if assumed away:
 
 - **`/tmp` is tmpfs, mounted `noexec,nosuid,nodev`.** Installers/builders that download-and-exec from `/tmp` fail with `Permission denied`. Set `TMPDIR=$HOME/tmp` or work under `$HOME`.
 - **Compilers are root-only (mode 750).** `gcc`, `g++`, `cc`, `c++`, `cpp`, `as`, plus versioned variants. Non-root cannot compile — native node modules (`better-sqlite3`, `node-gyp` builds), `CGO_ENABLED=1` Go builds, and Python wheels with C extensions all break on the host. Build in a container or CI.
@@ -55,4 +55,4 @@ Every host has run `debian-server-baseline.sh` (Debian 13 + 20 hardening section
 - **Other passive watchers.** AIDE has a filesystem baseline at `/var/lib/aide/aide.db`. rkhunter baseline at `/var/lib/rkhunter/db/rkhunter.dat`. debsums runs daily. sysstat + acct log process/resource activity. AppArmor is enforcing — most apps fine; niche custom binaries may need a profile or `aa-complain`.
 - **`unattended-upgrades` is active.** Security patches apply automatically and may restart services via `needrestart` (preconfigured to auto-restart, no prompts). Don't be surprised by overnight package version changes.
 - **Kernel modules blacklisted:** `usb-storage`, `firewire-core`/`-ohci`/`-sbp2` (no USB-drive mounting on servers), and rare network protocols `dccp`, `sctp`, `rds`, `tipc`.
-- **Re-runnable.** `debian-server-baseline.sh` is idempotent — re-run anytime to refresh. State that is preserved on re-run: authorized_keys, sudo password, UFW rules (additive), AIDE/rkhunter baselines, Netdata install, Lynis baseline log, `/etc/issue{,.net}` if customized, `/etc/fail2ban/jail.local` (user override slot — script writes to `jail.d/00-baseline.conf` instead).
+- **Re-runnable.** `base-server.sh` is idempotent — re-run anytime to refresh. State that is preserved on re-run: authorized_keys, sudo password, UFW rules (additive), AIDE/rkhunter baselines, Netdata install, Lynis baseline log, `/etc/issue{,.net}` if customized, `/etc/fail2ban/jail.local` (user override slot — script writes to `jail.d/00-baseline.conf` instead).

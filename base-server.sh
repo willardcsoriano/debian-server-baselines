@@ -15,8 +15,8 @@ note()    { echo -e "  ${DIM}$1${NC}"; }
 # ─── Preflight ────────────────────────────────────────────────────────────────
 
 clear
-echo -e "${BOLD}debian-server-baseline${NC}"
-echo -e "${DIM}Debian 13 server hardening — github.com/willardcsoriano/debian-server-baseline${NC}"
+echo -e "${BOLD}base-server${NC}"
+echo -e "${DIM}Debian 13 server hardening — github.com/willardcsoriano/debian-server-baselines${NC}"
 echo ""
 
 [[ $EUID -ne 0 ]]          && fail "Must run as root (or via sudo)."
@@ -262,7 +262,7 @@ section "8/20  Brute-force protection (fail2ban)"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq fail2ban
 mkdir -p /etc/fail2ban/jail.d
 cat > /etc/fail2ban/jail.d/00-baseline.conf <<'EOF'
-# Managed by debian-server-baseline. Place user overrides in /etc/fail2ban/jail.local
+# Managed by base-server. Place user overrides in /etc/fail2ban/jail.local
 [DEFAULT]
 bantime  = 1h
 findtime = 10m
@@ -295,7 +295,7 @@ fi
 if [[ ! -f /etc/fail2ban/jail.local ]]; then
   cat > /etc/fail2ban/jail.local <<'EOF'
 # fail2ban user override file. Loaded after jail.conf and jail.d/*.conf.
-# Add custom overrides here — debian-server-baseline will not touch this file
+# Add custom overrides here — base-server will not touch this file
 # unless its content exactly matches a legacy baseline write.
 EOF
 fi
@@ -506,7 +506,7 @@ section "15/20 Debian goodies + PAM strength"
 # is what the package would set anyway.
 mkdir -p /etc/needrestart/conf.d
 cat > /etc/needrestart/conf.d/50-autorestart.conf <<'EOF'
-# Managed by debian-server-baseline. 'a' = auto-restart, no prompts, no list.
+# Managed by base-server. 'a' = auto-restart, no prompts, no list.
 $nrconf{restart} = 'a';
 EOF
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
@@ -627,7 +627,7 @@ EOF
   # Forward security-relevant log facilities via TCP (@@) to the log server.
   # local6 captures auditd events once the syslog plugin above is active.
   cat > /etc/rsyslog.d/50-remote-syslog.conf <<EOF
-# Managed by debian-server-baseline — forward security logs to remote syslog server.
+# Managed by base-server — forward security logs to remote syslog server.
 auth,authpriv.*   @@${LOG_SERVER}:514
 kern.warning      @@${LOG_SERVER}:514
 daemon.*          @@${LOG_SERVER}:514
@@ -646,7 +646,7 @@ fi
 
 echo ""
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}  debian-server-baseline complete${NC}"
+echo -e "${BOLD}  base-server complete${NC}"
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo -e "  ${GREEN}✓${NC} /etc/hosts: 127.0.1.1 → $_hostname (sudo lookup fix)"
