@@ -27,7 +27,7 @@ My personal default tech stack across all projects. Captures the host-level base
 
 ## Dev tooling (from dev-server.sh)
 
-`dev-server.sh` (5 sections, run as the sudo user after `debian-server-baseline.sh`) installs the per-user dev stack. Inventory and the things that surprise:
+`dev-server.sh` (8 sections, run as the sudo user after `debian-server-baseline.sh`) installs the per-user dev stack. Inventory and the things that surprise:
 
 - **Docker rootless + Compose v2.** Packages: `docker-ce`, `docker-ce-cli`, `containerd.io`, `docker-buildx-plugin`, `docker-compose-plugin`, `docker-ce-rootless-extras`, `uidmap`. System-mode daemon disabled. Setup via `dockerd-rootless-setuptool.sh install`, then `systemctl --user enable --now docker` + `loginctl enable-linger $USER` so the daemon survives logout. `subuid`/`subgid` allocated `100000-165535`. `DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock` is exported in `~/.bashrc`. **Gotcha:** the daemon needs a live user dbus at `/run/user/<uid>/bus` — log in via SSH (real PAM session). `sudo -s` / `su <user>` does not give you one, and the role scripts (`prod-server.sh`, `dev-server.sh`) refuse to run without it. The install logic is identical to `prod-server.sh`; only `dev-server.sh` then layers the rest below.
 - **Node via nvm.** `nvm` installed to `~/.nvm`; Node LTS installed and `lts/*` is the default alias. `nvm` init lines are appended to `~/.bashrc` by its installer. After install, `exec $SHELL -l` to pick up `nvm` and `DOCKER_HOST` in the current shell.
@@ -35,6 +35,8 @@ My personal default tech stack across all projects. Captures the host-level base
 - **Claude Code CLI** (`claude`) — installed via Anthropic's native installer (`curl -fsSL https://claude.ai/install.sh | bash`), which drops a self-updating binary in `~/.local/bin/claude`. Not `npm -g` — that path orphaned the binary every time nvm bumped the LTS.
 - **`gh`** — GitHub CLI from `cli.github.com` apt repo (keyring at `/etc/apt/keyrings/github-cli.gpg`). Not snap, not a release-tarball download.
 - **`make`** — plain GNU make from apt for project-level orchestration (Makefiles are fine; the host has `make`, just not `gcc`).
+- **Bitwarden CLI (`bw`)** and **Secrets Manager CLI (`bws`)** — standalone binaries from `bitwarden/clients` / `bitwarden/sdk-sm` GitHub releases, dropped into `~/.local/bin` (`bws` is sha256-verified). Not `npm -g` (banned) and not `cargo install` (host compilers are root-only per the baseline).
+- **Gemini CLI (`gemini`)** — unlike `claude`, Google ships **no** native binary; `@google/gemini-cli` is npm-only. We install the `gemini-cli-bundle.zip` from `google-gemini/gemini-cli` GitHub releases — a multi-file, code-split ESM bundle (no shebang) — into `~/.local/lib/gemini-cli`, with a thin launcher in `~/.local/bin` that runs `node bundle/gemini.js`. **Node-dependent** (needs the nvm Node ≥ 20), not standalone — the one tool here that isn't decoupled from the toolchain.
 
 Re-runnable: `dev-server.sh` is idempotent. Preflight refuses to run as root, refuses if `debian-server-baseline.sh` hasn't run (checks `PermitRootLogin no` + UFW active), and refuses without a live user session.
 

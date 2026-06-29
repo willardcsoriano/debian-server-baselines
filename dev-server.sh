@@ -53,9 +53,9 @@ _user_bus="/run/user/$_user_uid/bus"
 pass "Preflight OK — $USER, session confirmed"
 echo ""
 
-# ─── 1/7  Docker Engine (rootless) + Compose ─────────────────────────────────
+# ─── 1/8  Docker Engine (rootless) + Compose ─────────────────────────────────
 
-section "1/7  Docker Engine (rootless) + Compose"
+section "1/8  Docker Engine (rootless) + Compose"
 
 # DRIFT: apt repo format, package names, and rootless install procedure
 # change roughly annually.  Verify before editing:
@@ -134,9 +134,9 @@ fi
 
 pass "Docker (rootless) + Compose installed; user daemon enabled; linger on"
 
-# ─── 2/7  nvm + Node LTS ─────────────────────────────────────────────────────
+# ─── 2/8  nvm + Node LTS ─────────────────────────────────────────────────────
 
-section "2/7  nvm + Node LTS"
+section "2/8  nvm + Node LTS"
 
 # DRIFT: version string in the raw GitHub URL changes with every nvm release.
 # Check the latest tag before editing:
@@ -161,18 +161,18 @@ nvm alias default 'lts/*'
 NODE_VER=$(node --version)
 pass "nvm installed; Node $NODE_VER (LTS) active"
 
-# ─── 3/7  Corepack ───────────────────────────────────────────────────────────
+# ─── 3/8  Corepack ───────────────────────────────────────────────────────────
 
-section "3/7  Corepack"
+section "3/8  Corepack"
 
 # Enables pnpm and yarn on demand per project via package.json#packageManager.
 # No global install needed; corepack downloads the right version at first use.
 corepack enable
 pass "Corepack enabled"
 
-# ─── 4/7  Claude Code CLI ────────────────────────────────────────────────────
+# ─── 4/8  Claude Code CLI ────────────────────────────────────────────────────
 
-section "4/7  Claude Code CLI"
+section "4/8  Claude Code CLI"
 
 # DRIFT: Anthropic's native installer is the recommended path.  The npm
 # package @anthropic-ai/claude-code still ships but couples claude to a
@@ -183,7 +183,7 @@ section "4/7  Claude Code CLI"
 #   https://code.claude.com/docs/en/setup
 # Last verified: 2026-05-22
 
-# Per-user bin dir shared with bw (6/7) and bws (7/7); set up here so
+# Per-user bin dir shared with bw (6/8) and bws (7/8); set up here so
 # claude's install location is on PATH before its idempotency check runs.
 mkdir -p "$HOME/.local/bin"
 if ! grep -q 'HOME/.local/bin' "$HOME/.bashrc" 2>/dev/null; then
@@ -204,9 +204,9 @@ else
   pass "Claude Code CLI installed ($CLAUDE_VER)"
 fi
 
-# ─── 5/7  Operator extras: gh, make ──────────────────────────────────────────
+# ─── 5/8  Operator extras: gh, make ──────────────────────────────────────────
 
-section "5/7  Operator extras (gh, make)"
+section "5/8  Operator extras (gh, make)"
 
 # ── gh ────────────────────────────────────────────────────────────────────────
 
@@ -244,9 +244,9 @@ else
   pass "make installed"
 fi
 
-# ─── 6/7  Bitwarden CLI (bw) ─────────────────────────────────────────────────
+# ─── 6/8  Bitwarden CLI (bw) ─────────────────────────────────────────────────
 
-section "6/7  Bitwarden CLI (bw)"
+section "6/8  Bitwarden CLI (bw)"
 
 # DRIFT: bw is published as prebuilt zips on GitHub releases under
 # bitwarden/clients with tag format cli-vYYYY.M.P.  Asset names follow
@@ -260,7 +260,7 @@ section "6/7  Bitwarden CLI (bw)"
 # only path that fits.
 # Last verified: 2026-05-22
 
-# Per-user bin dir and PATH are set up in section 4/7 (shared with claude).
+# Per-user bin dir and PATH are set up in section 4/8 (shared with claude).
 
 # unzip is required by both bw and bws install steps; apt-get is idempotent.
 sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq unzip
@@ -290,9 +290,9 @@ else
   pass "Bitwarden CLI installed ($BW_VER)"
 fi
 
-# ─── 7/7  Bitwarden Secrets Manager CLI (bws) ────────────────────────────────
+# ─── 7/8  Bitwarden Secrets Manager CLI (bws) ────────────────────────────────
 
-section "7/7  Bitwarden Secrets Manager CLI (bws)"
+section "7/8  Bitwarden Secrets Manager CLI (bws)"
 
 # DRIFT: bws is published as prebuilt zips on GitHub releases under
 # bitwarden/sdk-sm with tag format bws-vX.Y.Z.  Asset names follow
@@ -334,6 +334,56 @@ else
   pass "bws installed ($BWS_VER)"
 fi
 
+# ─── 8/8  Gemini CLI ─────────────────────────────────────────────────────────
+
+section "8/8  Gemini CLI"
+
+# DRIFT: Google ships no native installer or standalone binary for Gemini CLI
+# (unlike claude).  @google/gemini-cli is npm-only, which ENV_STACK.md forbids
+# (npm -g globals orphan under nvm LTS bumps).  Each GitHub release ships ONE
+# asset, gemini-cli-bundle.zip — a multi-file, code-split ESM bundle (esbuild
+# splitting:true), no node shebang, bin entry bundle/gemini.js, requiring
+# Node >=20 (satisfied by the nvm Node LTS from section 2/8).  So we extract the
+# bundle to ~/.local/lib/gemini-cli and drop a thin `gemini` launcher in
+# ~/.local/bin that execs it with node.  No checksum file is published beside
+# the asset, so (unlike bws) we cannot sha256-verify the download.  Verify if
+# release-asset naming, the bundle entrypoint, or the Node floor changes:
+#   https://github.com/google-gemini/gemini-cli
+#   https://github.com/google-gemini/gemini-cli/releases
+# Last verified: 2026-06-07
+
+# Per-user bin dir and PATH are set up in section 4/8 (shared with claude);
+# unzip was installed in section 6/8.
+
+if command -v gemini &>/dev/null; then
+  GEMINI_VER=$(gemini --version 2>/dev/null | head -1 || echo "installed")
+  pass "Gemini CLI already installed ($GEMINI_VER)"
+else
+  _gemini_url=$(curl -fsSL https://api.github.com/repos/google-gemini/gemini-cli/releases/latest \
+    | grep -oP '"browser_download_url":\s*"\K[^"]*gemini-cli-bundle\.zip')
+  [[ -n "$_gemini_url" ]] || fail "Could not determine latest gemini-cli bundle URL"
+
+  _gemini_lib="$HOME/.local/lib/gemini-cli"
+  _tmp=$(mktemp -d)
+  curl -fsSL -o "$_tmp/gemini.zip" "$_gemini_url"
+  rm -rf "$_gemini_lib"
+  mkdir -p "$_gemini_lib"
+  unzip -q "$_tmp/gemini.zip" -d "$_gemini_lib"
+  rm -rf "$_tmp"
+
+  # The zip may extract as bundle/gemini.js or gemini.js — locate the entrypoint.
+  _gemini_entry=$(find "$_gemini_lib" -maxdepth 2 -name gemini.js | head -1)
+  [[ -n "$_gemini_entry" ]] || fail "gemini.js not found in extracted bundle"
+
+  cat > "$HOME/.local/bin/gemini" <<EOF
+#!/usr/bin/env bash
+exec node "$_gemini_entry" "\$@"
+EOF
+  chmod 0755 "$HOME/.local/bin/gemini"
+  GEMINI_VER=$(gemini --version 2>/dev/null | head -1 || echo "installed")
+  pass "Gemini CLI installed ($GEMINI_VER)"
+fi
+
 # ─── Summary ─────────────────────────────────────────────────────────────────
 
 echo ""
@@ -349,6 +399,7 @@ echo -e "  ${GREEN}✓${NC} gh: $GH_VER"
 echo -e "  ${GREEN}✓${NC} make: $(make --version | head -1)"
 echo -e "  ${GREEN}✓${NC} Bitwarden CLI: $BW_VER"
 echo -e "  ${GREEN}✓${NC} Bitwarden Secrets Manager CLI: $BWS_VER"
+echo -e "  ${GREEN}✓${NC} Gemini CLI: $GEMINI_VER ${DIM}(runs on the nvm Node)${NC}"
 echo ""
 echo -e "  Log in as: ${BOLD}ssh $USER@$SERVER_IP${NC}"
 echo -e "  ${YELLOW}Reload your shell${NC} (${DIM}exec \$SHELL -l${NC}) to activate nvm, DOCKER_HOST, and ~/.local/bin."

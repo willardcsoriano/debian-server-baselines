@@ -12,7 +12,8 @@ Project-specific drift runbook for `debian-server-baseline`. Run this whenever y
 - [2. Netdata (debian-server-baseline.sh, section 11) — Medium risk](#2-netdata-debian-server-baselinesh-section-11-medium-risk)
 - [3. Lynis (debian-server-baseline.sh, section 18) — Medium risk](#3-lynis-debian-server-baselinesh-section-18-medium-risk)
 - [4. Debian target version — Medium risk](#4-debian-target-version-medium-risk)
-- [5. Quick sanity checks (no fetch required)](#5-quick-sanity-checks-no-fetch-required)
+- [5. Gemini CLI (dev-server.sh, section 8) — Medium risk](#5-gemini-cli-dev-serversh-section-8-medium-risk)
+- [6. Quick sanity checks (no fetch required)](#6-quick-sanity-checks-no-fetch-required)
 - [Reporting format](#reporting-format)
 
 ## How to invoke
@@ -91,7 +92,25 @@ Tell the agent: `check @DRIFTCHECK.md` or `run the drift check`. The agent fetch
 
 ---
 
-## 5. Quick sanity checks (no fetch required)
+## 5. Gemini CLI (dev-server.sh, section 8) — Medium risk
+
+**Why:** Google ships no native installer or standalone binary — the dev-server install depends on the GitHub release artifact `gemini-cli-bundle.zip` and its internal layout. Both the asset name and the bundle entrypoint (`bundle/gemini.js`) have changed shape before (single-file → code-split), and the Node floor can rise. Any of these silently breaks the launcher.
+
+**Fetch:**
+- https://github.com/google-gemini/gemini-cli
+- https://github.com/google-gemini/gemini-cli/releases
+
+**Check against `dev-server.sh` section 8:**
+- Release still ships a single asset named `gemini-cli-bundle.zip` (the `grep -oP '…gemini-cli-bundle\.zip'` against `/releases/latest` must still match).
+- Bundle's bin entry is still `gemini.js` (the `find -maxdepth 2 -name gemini.js` locator) — confirm via `package.json#bin` (`bundle/gemini.js`).
+- `engines.node` floor (currently `>=20`) is still satisfied by the nvm Node LTS from section 2.
+- Whether Google has started publishing a real native binary or a checksum file (would let us drop the node-launcher shim / add sha256 verification).
+
+**Report:** any asset rename, entrypoint move, Node floor bump, or new native-install path. If the asset/entrypoint changed, propose the fix to `dev-server.sh` section 8.
+
+---
+
+## 6. Quick sanity checks (no fetch required)
 
 Run these locally — they catch internal drift without network calls:
 
@@ -105,6 +124,10 @@ shellcheck debian-server-baseline.sh prod-server.sh dev-server.sh syslog-baselin
 # Base script section count (should still be 20)
 grep -c 'section "' debian-server-baseline.sh
 grep -oP '\d+(?=/)' debian-server-baseline.sh | sort -n | uniq | tail -1   # highest N in N/20
+
+# dev-server section count (should still be 8)
+grep -c 'section "' dev-server.sh
+grep -oP '\d+(?=/8)' dev-server.sh | sort -n | uniq | tail -1              # highest N in N/8
 
 # Summary block matches section count
 grep -c '✓\|✗\|–' debian-server-baseline.sh | tail -1
