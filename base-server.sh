@@ -250,11 +250,22 @@ section "7/20  Firewall (UFW)"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ufw
 ufw default deny incoming  > /dev/null
 ufw default allow outgoing > /dev/null
-for port in 22 80 443; do
-  ufw allow "$port"/tcp > /dev/null
-done
+# SSH always world-open — you need to get in from anywhere
+ufw allow 22/tcp > /dev/null
+
+# HTTP/HTTPS: restrict to $ALLOW_HTTP_CIDRS if set, otherwise world-open
+if [[ -n "${ALLOW_HTTP_CIDRS:-}" ]]; then
+  for cidr in $ALLOW_HTTP_CIDRS; do
+    ufw allow from "$cidr" to any port 80,443 proto tcp > /dev/null
+  done
+  pass "UFW enabled — SSH:22 open, 80/443 restricted to: $ALLOW_HTTP_CIDRS"
+else
+  for port in 80 443; do
+    ufw allow "$port"/tcp > /dev/null
+  done
+  pass "UFW enabled — ports 22, 80, 443 open"
+fi
 ufw --force enable > /dev/null
-pass "UFW enabled — ports 22, 80, 443 open"
 
 # ─── 8. fail2ban ─────────────────────────────────────────────────────────────
 
@@ -443,9 +454,16 @@ cat > /etc/audit/rules.d/50-baseline.rules <<'EOF'
 -w /sbin/rmmod     -p x -k modules
 -w /sbin/modprobe  -p x -k modules
 -a always,exit -F arch=b64 -S init_module,finit_module,delete_module -k modules
+
+## Command execution — logs every execve() with uid, auid, comm, exe, tty.
+## On a single-user server this generates ~200–500 events per SSH session.
+## With remote syslog forwarding (section 20), commands ship off-box in
+## real time via the auditd syslog plugin → rsyslog local6.* → TCP 514.
+-a always,exit -F arch=b64 -S execve -k commands
+-a always,exit -F arch=b32 -S execve -k commands
 EOF
 augenrules --load >/dev/null 2>&1 || systemctl restart auditd
-pass "auditd active (baseline ruleset loaded)"
+pass "auditd active (file watches + execve command logging loaded)"
 
 # ─── 13. Legal banners ───────────────────────────────────────────────────────
 
@@ -667,7 +685,7 @@ if [[ $INSTALL_MONITORING -eq 1 ]]; then
 else
   echo -e "  ${DIM}–${NC} Monitoring: skipped"
 fi
-echo -e "  ${GREEN}✓${NC} rkhunter + auditd + AIDE: intrusion detection active"
+echo -e "  ${GREEN}✓${NC} rkhunter + auditd + AIDE: intrusion detection + command logging active"
 echo -e "  ${GREEN}✓${NC} Legal banners + password policy enforced"
 echo -e "  ${GREEN}✓${NC} Debian-goodies + PAM strength installed"
 echo -e "  ${GREEN}✓${NC} Unused kernel modules blacklisted"

@@ -132,6 +132,15 @@ export DOCKER_HOST=unix:///run/user/$(id -u)/docker.sock
 EOF
 fi
 
+# Allow rootless Docker to bind to port 80 (nginx).  Without this, the
+# kernel rejects unprivileged binds below 1024 and the nginx container
+# fails to start with nothing in the logs.
+if ! grep -q "ip_unprivileged_port_start=80" /etc/sysctl.d/99-unprivileged-ports.conf 2>/dev/null; then
+  echo "net.ipv4.ip_unprivileged_port_start=80" \
+    | sudo tee /etc/sysctl.d/99-unprivileged-ports.conf > /dev/null
+  sudo sysctl net.ipv4.ip_unprivileged_port_start=80 > /dev/null
+fi
+
 pass "Docker (rootless) + Compose installed; user daemon enabled; linger on"
 
 # ─── 2/8  nvm + Node LTS ─────────────────────────────────────────────────────
@@ -392,6 +401,7 @@ echo -e "${BOLD}  debian-dev-server complete${NC}"
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo -e "  ${GREEN}✓${NC} Docker: rootless + Compose, user daemon enabled, linger on"
+echo -e "  ${GREEN}✓${NC} Unprivileged port 80 enabled for rootless nginx"
 echo -e "  ${GREEN}✓${NC} nvm + Node LTS: ${BOLD}$NODE_VER${NC}"
 echo -e "  ${GREEN}✓${NC} Corepack: pnpm and yarn available on demand"
 echo -e "  ${GREEN}✓${NC} Claude Code: $CLAUDE_VER"
