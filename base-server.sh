@@ -15,8 +15,8 @@ note()    { echo -e "  ${DIM}$1${NC}"; }
 # ─── Preflight ────────────────────────────────────────────────────────────────
 
 clear
-echo -e "${BOLD}debian-server-baseline${NC}"
-echo -e "${DIM}Debian 13 server hardening — github.com/willardcsoriano/debian-server-baseline${NC}"
+echo -e "${BOLD}base-server${NC}"
+echo -e "${DIM}Debian 13 server hardening — github.com/willardcsoriano/debian-server-baselines${NC}"
 echo ""
 
 [[ $EUID -ne 0 ]]          && fail "Must run as root (or via sudo)."
@@ -250,11 +250,22 @@ section "7/20  Firewall (UFW)"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq ufw
 ufw default deny incoming  > /dev/null
 ufw default allow outgoing > /dev/null
-for port in 22 80 443; do
-  ufw allow "$port"/tcp > /dev/null
-done
+# SSH always world-open — you need to get in from anywhere
+ufw allow 22/tcp > /dev/null
+
+# HTTP/HTTPS: restrict to $ALLOW_HTTP_CIDRS if set, otherwise world-open
+if [[ -n "${ALLOW_HTTP_CIDRS:-}" ]]; then
+  for cidr in $ALLOW_HTTP_CIDRS; do
+    ufw allow from "$cidr" to any port 80,443 proto tcp > /dev/null
+  done
+  pass "UFW enabled — SSH:22 open, 80/443 restricted to: $ALLOW_HTTP_CIDRS"
+else
+  for port in 80 443; do
+    ufw allow "$port"/tcp > /dev/null
+  done
+  pass "UFW enabled — ports 22, 80, 443 open"
+fi
 ufw --force enable > /dev/null
-pass "UFW enabled — ports 22, 80, 443 open"
 
 # ─── 8. fail2ban ─────────────────────────────────────────────────────────────
 
@@ -262,7 +273,7 @@ section "8/20  Brute-force protection (fail2ban)"
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq fail2ban
 mkdir -p /etc/fail2ban/jail.d
 cat > /etc/fail2ban/jail.d/00-baseline.conf <<'EOF'
-# Managed by debian-server-baseline. Place user overrides in /etc/fail2ban/jail.local
+# Managed by base-server. Place user overrides in /etc/fail2ban/jail.local
 [DEFAULT]
 bantime  = 1h
 findtime = 10m
@@ -295,7 +306,7 @@ fi
 if [[ ! -f /etc/fail2ban/jail.local ]]; then
   cat > /etc/fail2ban/jail.local <<'EOF'
 # fail2ban user override file. Loaded after jail.conf and jail.d/*.conf.
-# Add custom overrides here — debian-server-baseline will not touch this file
+# Add custom overrides here — base-server will not touch this file
 # unless its content exactly matches a legacy baseline write.
 EOF
 fi
@@ -443,9 +454,16 @@ cat > /etc/audit/rules.d/50-baseline.rules <<'EOF'
 -w /sbin/rmmod     -p x -k modules
 -w /sbin/modprobe  -p x -k modules
 -a always,exit -F arch=b64 -S init_module,finit_module,delete_module -k modules
+
+## Command execution — logs every execve() with uid, auid, comm, exe, tty.
+## On a single-user server this generates ~200–500 events per SSH session.
+## With remote syslog forwarding (section 20), commands ship off-box in
+## real time via the auditd syslog plugin → rsyslog local6.* → TCP 514.
+-a always,exit -F arch=b64 -S execve -k commands
+-a always,exit -F arch=b32 -S execve -k commands
 EOF
 augenrules --load >/dev/null 2>&1 || systemctl restart auditd
-pass "auditd active (baseline ruleset loaded)"
+pass "auditd active (file watches + execve command logging loaded)"
 
 # ─── 13. Legal banners ───────────────────────────────────────────────────────
 
@@ -506,7 +524,7 @@ section "15/20 Debian goodies + PAM strength"
 # is what the package would set anyway.
 mkdir -p /etc/needrestart/conf.d
 cat > /etc/needrestart/conf.d/50-autorestart.conf <<'EOF'
-# Managed by debian-server-baseline. 'a' = auto-restart, no prompts, no list.
+# Managed by base-server. 'a' = auto-restart, no prompts, no list.
 $nrconf{restart} = 'a';
 EOF
 DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
@@ -627,7 +645,7 @@ EOF
   # Forward security-relevant log facilities via TCP (@@) to the log server.
   # local6 captures auditd events once the syslog plugin above is active.
   cat > /etc/rsyslog.d/50-remote-syslog.conf <<EOF
-# Managed by debian-server-baseline — forward security logs to remote syslog server.
+# Managed by base-server — forward security logs to remote syslog server.
 auth,authpriv.*   @@${LOG_SERVER}:514
 kern.warning      @@${LOG_SERVER}:514
 daemon.*          @@${LOG_SERVER}:514
@@ -646,7 +664,7 @@ fi
 
 echo ""
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}  debian-server-baseline complete${NC}"
+echo -e "${BOLD}  base-server complete${NC}"
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo -e "  ${GREEN}✓${NC} /etc/hosts: 127.0.1.1 → $_hostname (sudo lookup fix)"
@@ -667,7 +685,7 @@ if [[ $INSTALL_MONITORING -eq 1 ]]; then
 else
   echo -e "  ${DIM}–${NC} Monitoring: skipped"
 fi
-echo -e "  ${GREEN}✓${NC} rkhunter + auditd + AIDE: intrusion detection active"
+echo -e "  ${GREEN}✓${NC} rkhunter + auditd + AIDE: intrusion detection + command logging active"
 echo -e "  ${GREEN}✓${NC} Legal banners + password policy enforced"
 echo -e "  ${GREEN}✓${NC} Debian-goodies + PAM strength installed"
 echo -e "  ${GREEN}✓${NC} Unused kernel modules blacklisted"

@@ -15,7 +15,7 @@ Repo-scoped working notes that supplement [`CLAUDE.md`](CLAUDE.md). `CLAUDE.md` 
 
 ## Next session pickup
 
-This block exists so a future session can resume cold. Current `origin/main` tip: `e735af9` (docs(readme): move quick reference to a table above overview). Repo layout: `debian-server-baseline.sh` (base) + `prod-server.sh` + `dev-server.sh` + `syslog-baseline.sh` (log receiver) + `wireguard-baseline.sh` (WireGuard peer). Docs live under `docs/`. Install model is **git clone + bash** (private repo — curl|bash was dropped in `cd225c4`).
+This block exists so a future session can resume cold. Current `origin/main` tip: `e735af9` (docs(readme): move quick reference to a table above overview). Repo layout: `base-server.sh` (base) + `prod-server.sh` + `dev-server.sh` + `syslog-baseline.sh` (log receiver) + `wireguard-baseline.sh` (WireGuard peer). Docs live under `docs/`. Install model is **git clone + bash** (private repo — curl|bash was dropped in `cd225c4`).
 
 ### Open decision: inline vs pre-commit hook for the Docker block
 
@@ -51,4 +51,4 @@ You already use this same hook pattern in your `claude-config` repo (commit-msg 
 
 ## Open follow-ups
 
-- **UMASK 027 ↔ Docker bind-mount interaction.** See [`docs/reports/docker-umask-bind-mount-interaction.md`](docs/reports/docker-umask-bind-mount-interaction.md). The "What `debian-server-baseline` could add" section proposes either a preflight note for Docker users or a CLAUDE.md sidebar covering the umask × `USERGROUPS_ENAB` × container-UID collision. Not yet implemented.
+- **UMASK 027 ↔ Docker bind-mount interaction.** See [`docs/reports/docker-umask-bind-mount-interaction.md`](docs/reports/docker-umask-bind-mount-interaction.md). The "What `base-server` could add" section proposes either a preflight note for Docker users or a CLAUDE.md sidebar covering the umask × `USERGROUPS_ENAB` × container-UID collision. Not yet implemented.

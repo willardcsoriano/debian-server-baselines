@@ -34,13 +34,13 @@ pass "Debian $VERSION_ID ($VERSION_CODENAME) on $SERVER_IP"
 
 # Confirm user has sudo access
 groups | grep -qw sudo \
-  || fail "$USER is not in the sudo group. Run debian-server-baseline.sh first."
+  || fail "$USER is not in the sudo group. Run base-server.sh first."
 
-# Confirm debian-server-baseline.sh has run: root SSH is off and firewall is active
+# Confirm base-server.sh has run: root SSH is off and firewall is active
 grep -q "^PermitRootLogin no" /etc/ssh/sshd_config 2>/dev/null \
-  || fail "debian-server-baseline.sh has not run on this host (PermitRootLogin still on)."
+  || fail "base-server.sh has not run on this host (PermitRootLogin still on)."
 systemctl is-active --quiet ufw \
-  || fail "debian-server-baseline.sh has not run on this host (UFW not active)."
+  || fail "base-server.sh has not run on this host (UFW not active)."
 
 # Confirm a user session is live — required by rootless Docker's systemd user
 # daemon.  An SSH login gives you one automatically.  Running via sudo -s or su
