@@ -32,14 +32,21 @@ Idempotent hardening and role-specific tooling for Debian 13 servers. Every serv
 
 ## Setup
 
-Clone the repo once on your local machine. SCP or clone it onto each server, then run the relevant script directly.
+**Public repo — run directly on the server:**
 
 ```bash
 git clone git@github.com:willardcsoriano/debian-server-baselines.git
 cd debian-server-baselines
 ```
 
-On the server:
+**Private repo — clone and run locally:**
+
+```bash
+git clone git@github.com:willardcsoriano/debian-server-baselines.git
+cd debian-server-baselines
+```
+
+Then on the server:
 
 ```bash
 sudo bash base-server.sh
