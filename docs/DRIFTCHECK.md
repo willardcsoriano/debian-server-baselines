@@ -12,7 +12,7 @@ Project-specific drift runbook for `base-server`. Run this whenever you return t
 - [2. Netdata (base-server.sh, section 11) — Medium risk](#2-netdata-base-serversh-section-11-medium-risk)
 - [3. Lynis (base-server.sh, section 18) — Medium risk](#3-lynis-base-serversh-section-18-medium-risk)
 - [4. Debian target version — Medium risk](#4-debian-target-version-medium-risk)
-- [5. Gemini CLI (dev-server.sh, section 8) — Medium risk](#5-gemini-cli-dev-serversh-section-8-medium-risk)
+- [5. Antigravity CLI (dev-server.sh, section 8) — High risk](#5-antigravity-cli-dev-serversh-section-8-high-risk)
 - [6. Quick sanity checks (no fetch required)](#6-quick-sanity-checks-no-fetch-required)
 - [Reporting format](#reporting-format)
 
@@ -92,21 +92,22 @@ Tell the agent: `check @DRIFTCHECK.md` or `run the drift check`. The agent fetch
 
 ---
 
-## 5. Gemini CLI (dev-server.sh, section 8) — Medium risk
+## 5. Antigravity CLI (dev-server.sh, section 8) — High risk
 
-**Why:** Google ships no native installer or standalone binary — the dev-server install depends on the GitHub release artifact `gemini-cli-bundle.zip` and its internal layout. Both the asset name and the bundle entrypoint (`bundle/gemini.js`) have changed shape before (single-file → code-split), and the Node floor can rise. Any of these silently breaks the launcher.
+**Why:** New, fast-moving Google product — it superseded Gemini CLI on 2026-06-18. The install pipes Google's hosted installer (`antigravity.google/cli/install.sh`) to `bash`; the installer URL, the binary name (`agy`), the install path (`~/.local/bin/agy`), and the SSH auth flow could all shift while the product stabilizes. A rename or a changed installer endpoint silently breaks the section.
 
 **Fetch:**
-- https://github.com/google-gemini/gemini-cli
-- https://github.com/google-gemini/gemini-cli/releases
+- https://antigravity.google/docs/cli-install
+- https://github.com/google-antigravity/antigravity-cli
 
 **Check against `dev-server.sh` section 8:**
-- Release still ships a single asset named `gemini-cli-bundle.zip` (the `grep -oP '…gemini-cli-bundle\.zip'` against `/releases/latest` must still match).
-- Bundle's bin entry is still `gemini.js` (the `find -maxdepth 2 -name gemini.js` locator) — confirm via `package.json#bin` (`bundle/gemini.js`).
-- `engines.node` floor (currently `>=20`) is still satisfied by the nvm Node LTS from section 2.
-- Whether Google has started publishing a real native binary or a checksum file (would let us drop the node-launcher shim / add sha256 verification).
+- Install command is still `curl -fsSL https://antigravity.google/cli/install.sh | bash` (endpoint unchanged, still SHA512-verifies the download against its manifest).
+- Binary is still named `agy` and lands in `~/.local/bin` (the `command -v agy` idempotency guard and the summary line depend on it).
+- Still a native, Node-independent binary — no reintroduced npm/Node dependency.
+- Whether a version-pinning env var has appeared (the installer currently always fetches latest — worth pinning if it does).
+- Whether Gemini CLI has been fully retired or the `agy plugin import gemini` migration path has changed.
 
-**Report:** any asset rename, entrypoint move, Node floor bump, or new native-install path. If the asset/entrypoint changed, propose the fix to `dev-server.sh` section 8.
+**Report:** any installer-URL change, binary rename, install-path move, new Node dependency, or new pinning option. If anything changed, propose the fix to `dev-server.sh` section 8.
 
 ---
 

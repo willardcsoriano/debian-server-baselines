@@ -32,24 +32,26 @@ Idempotent hardening and role-specific tooling for Debian 13 servers. Every serv
 
 ## Setup
 
-**Public repo — run directly on the server:**
+Every script reads its prompts from `/dev/tty`, so both paths below behave identically — pick by whether the repo is public or private. Base, syslog, and WireGuard run as **root** (`sudo bash`); prod and dev run as your **sudo user** (plain `bash` — they escalate internally and refuse to run as root).
+
+**Public repo — curl straight to bash, nothing to clone:**
+
+```bash
+# base / syslog / wireguard — run as root:
+curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baselines/main/base-server.sh | sudo bash
+
+# prod / dev — run as your sudo user (no sudo):
+curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baselines/main/dev-server.sh | bash
+```
+
+Swap the filename for `prod-server.sh`, `syslog-baseline.sh`, or `wireguard-baseline.sh`.
+
+**Private repo — clone, then run locally:**
 
 ```bash
 git clone git@github.com:willardcsoriano/debian-server-baselines.git
 cd debian-server-baselines
-```
-
-**Private repo — clone and run locally:**
-
-```bash
-git clone git@github.com:willardcsoriano/debian-server-baselines.git
-cd debian-server-baselines
-```
-
-Then on the server:
-
-```bash
-sudo bash base-server.sh
+sudo bash base-server.sh   # or, as your sudo user:  bash dev-server.sh
 ```
 
 ## What the base does
@@ -117,7 +119,7 @@ Same Docker setup as `prod-server.sh`, plus:
 - GNU `make` for project-level orchestration
 - Bitwarden CLI (`bw`) — standalone binary from `bitwarden/clients` GitHub releases, installed to `~/.local/bin` (no `npm -g`)
 - Bitwarden Secrets Manager CLI (`bws`) — standalone binary from `bitwarden/sdk-sm` GitHub releases, sha256-verified, installed to `~/.local/bin`
-- Gemini CLI (`gemini`) — bundle from `google-gemini/gemini-cli` GitHub releases, extracted to `~/.local/lib/gemini-cli` with a launcher in `~/.local/bin` (no `npm -g`; runs on the nvm Node ≥ 20)
+- Antigravity CLI (`agy`) — Google's native installer (`antigravity.google/cli/install.sh`) drops a SHA512-verified, Node-independent binary in `~/.local/bin/agy`. Replaces the Gemini CLI, which Google retired on 2026-06-18 (now paid-Enterprise-API-key only). Import old config with `agy plugin import gemini`
 
 ### syslog-baseline.sh — central log receiver
 

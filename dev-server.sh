@@ -343,54 +343,36 @@ else
   pass "bws installed ($BWS_VER)"
 fi
 
-# ─── 8/8  Gemini CLI ─────────────────────────────────────────────────────────
+# ─── 8/8  Antigravity CLI ────────────────────────────────────────────────────
 
-section "8/8  Gemini CLI"
+section "8/8  Antigravity CLI"
 
-# DRIFT: Google ships no native installer or standalone binary for Gemini CLI
-# (unlike claude).  @google/gemini-cli is npm-only, which ENV_STACK.md forbids
-# (npm -g globals orphan under nvm LTS bumps).  Each GitHub release ships ONE
-# asset, gemini-cli-bundle.zip — a multi-file, code-split ESM bundle (esbuild
-# splitting:true), no node shebang, bin entry bundle/gemini.js, requiring
-# Node >=20 (satisfied by the nvm Node LTS from section 2/8).  So we extract the
-# bundle to ~/.local/lib/gemini-cli and drop a thin `gemini` launcher in
-# ~/.local/bin that execs it with node.  No checksum file is published beside
-# the asset, so (unlike bws) we cannot sha256-verify the download.  Verify if
-# release-asset naming, the bundle entrypoint, or the Node floor changes:
-#   https://github.com/google-gemini/gemini-cli
-#   https://github.com/google-gemini/gemini-cli/releases
-# Last verified: 2026-06-07
+# DRIFT: Google deprecated Gemini CLI on 2026-06-18 — for AI Pro/Ultra and
+# free-tier accounts it stopped serving requests and is superseded by
+# Antigravity CLI (agy).  (Gemini CLI now works only with paid Gemini
+# Enterprise API keys.)  Google's native installer is the supported path: it
+# resolves the latest native binary from a Google-hosted manifest, verifies the
+# download's SHA512 against that manifest (halts on mismatch), and drops a
+# self-contained, Node-independent binary in ~/.local/bin/agy — no npm, no nvm
+# coupling, mirroring the claude installer in section 4/8.  There is no
+# version-pinning env var; it always installs the latest.  Verify before
+# editing (installer path, binary name, or auth flow):
+#   https://antigravity.google/docs/cli-install
+#   https://github.com/google-antigravity/antigravity-cli
+# On a headless server agy authenticates on first run by detecting the SSH
+# session and printing a Google Sign-In URL to complete in a local browser.
+# Import an existing Gemini CLI config with:  agy plugin import gemini
+# Last verified: 2026-07-06
 
-# Per-user bin dir and PATH are set up in section 4/8 (shared with claude);
-# unzip was installed in section 6/8.
+# Per-user bin dir and PATH are set up in section 4/8 (shared with claude).
 
-if command -v gemini &>/dev/null; then
-  GEMINI_VER=$(gemini --version 2>/dev/null | head -1 || echo "installed")
-  pass "Gemini CLI already installed ($GEMINI_VER)"
+if command -v agy &>/dev/null; then
+  AGY_VER=$(agy --version 2>/dev/null | head -1 || echo "installed")
+  pass "Antigravity CLI already installed ($AGY_VER)"
 else
-  _gemini_url=$(curl -fsSL https://api.github.com/repos/google-gemini/gemini-cli/releases/latest \
-    | grep -oP '"browser_download_url":\s*"\K[^"]*gemini-cli-bundle\.zip')
-  [[ -n "$_gemini_url" ]] || fail "Could not determine latest gemini-cli bundle URL"
-
-  _gemini_lib="$HOME/.local/lib/gemini-cli"
-  _tmp=$(mktemp -d)
-  curl -fsSL -o "$_tmp/gemini.zip" "$_gemini_url"
-  rm -rf "$_gemini_lib"
-  mkdir -p "$_gemini_lib"
-  unzip -q "$_tmp/gemini.zip" -d "$_gemini_lib"
-  rm -rf "$_tmp"
-
-  # The zip may extract as bundle/gemini.js or gemini.js — locate the entrypoint.
-  _gemini_entry=$(find "$_gemini_lib" -maxdepth 2 -name gemini.js | head -1)
-  [[ -n "$_gemini_entry" ]] || fail "gemini.js not found in extracted bundle"
-
-  cat > "$HOME/.local/bin/gemini" <<EOF
-#!/usr/bin/env bash
-exec node "$_gemini_entry" "\$@"
-EOF
-  chmod 0755 "$HOME/.local/bin/gemini"
-  GEMINI_VER=$(gemini --version 2>/dev/null | head -1 || echo "installed")
-  pass "Gemini CLI installed ($GEMINI_VER)"
+  curl -fsSL https://antigravity.google/cli/install.sh | bash
+  AGY_VER=$(agy --version 2>/dev/null | head -1 || echo "installed")
+  pass "Antigravity CLI installed ($AGY_VER)"
 fi
 
 # ─── Summary ─────────────────────────────────────────────────────────────────
@@ -409,7 +391,7 @@ echo -e "  ${GREEN}✓${NC} gh: $GH_VER"
 echo -e "  ${GREEN}✓${NC} make: $(make --version | head -1)"
 echo -e "  ${GREEN}✓${NC} Bitwarden CLI: $BW_VER"
 echo -e "  ${GREEN}✓${NC} Bitwarden Secrets Manager CLI: $BWS_VER"
-echo -e "  ${GREEN}✓${NC} Gemini CLI: $GEMINI_VER ${DIM}(runs on the nvm Node)${NC}"
+echo -e "  ${GREEN}✓${NC} Antigravity CLI: $AGY_VER ${DIM}(native binary, no Node)${NC}"
 echo ""
 echo -e "  Log in as: ${BOLD}ssh $USER@$SERVER_IP${NC}"
 echo -e "  ${YELLOW}Reload your shell${NC} (${DIM}exec \$SHELL -l${NC}) to activate nvm, DOCKER_HOST, and ~/.local/bin."
