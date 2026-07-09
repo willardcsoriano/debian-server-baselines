@@ -109,7 +109,7 @@ The base hardens any server type. Role scripts layer the tooling each kind of se
 bash prod-server.sh
 ```
 
-Installs rootless Docker + Compose v2, plus the Bitwarden Secrets Manager CLI (`bws`) for pulling deploy secrets without storing them in a plaintext `.env` on disk. Disables the system-mode Docker daemon (rootless replaces it), allocates `subuid`/`subgid`, enables linger so the user daemon survives logout, exports `DOCKER_HOST` in `~/.bashrc`. No Node, no language toolchains — apps deploy as container images pulled from a registry. After install: `docker login ghcr.io` (or your registry of choice), then inject secrets at deploy time instead of committing them to disk:
+Installs rootless Docker + Compose v2, plus the Bitwarden Secrets Manager CLI (`bws`) for pulling deploy secrets without storing them in a plaintext `.env` on disk. Disables the system-mode Docker daemon (rootless replaces it), allocates `subuid`/`subgid`, enables linger so the user daemon survives logout, exports `DOCKER_HOST` in `~/.bashrc`. No Node, no language toolchains — apps deploy as container images pulled from a registry. After install: `docker login ghcr.io` (or your registry of choice) — note this persists a credential to `~/.docker/config.json` (base64, not encrypted), so for a leaner footprint wrap it with `bws` and `docker logout` instead of leaving it logged in indefinitely. Then inject secrets at deploy time instead of committing them to disk:
 
 ```bash
 export BWS_ACCESS_TOKEN=<machine-account-token>   # from your shell profile or a secret store, never checked in
