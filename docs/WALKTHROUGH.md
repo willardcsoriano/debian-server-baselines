@@ -122,13 +122,13 @@ Then it asks for the sudo username — pre-filled from the existing sudo group o
 
 ## 1/20 — System updates
 
-**What it does:** Runs `apt-get update` then `apt-get upgrade -y` to bring every installed package to its current version.
+**What it does:** Runs `apt-get update` then `apt-get upgrade -y` to bring every installed package to its current version, then purges any packages left in `rc` state (removed but config/cron/init scripts still present from a past plain `apt remove`).
 
-**Files/state changed:** Package cache at `/var/lib/apt/lists/`, all installed packages.
+**Files/state changed:** Package cache at `/var/lib/apt/lists/`, all installed packages. Any `rc`-state package's leftover config, cron jobs, and startup scripts are removed.
 
-**Threat model:** Unpatched packages are the #1 vector for opportunistic attackers. A Debian 13 image cut three months ago has known CVEs by the time you boot it. This closes them.
+**Threat model:** Unpatched packages are the #1 vector for opportunistic attackers. A Debian 13 image cut three months ago has known CVEs by the time you boot it. This closes them. The `rc`-state purge is Lynis `PKGS-7346` — stale config/cron/init scripts from long-removed packages are dead weight, not a live attack surface, but cleaning them up is free and idempotent (only acts if any exist).
 
-**Verify after:** `apt list --upgradable` should print nothing.
+**Verify after:** `apt list --upgradable` should print nothing. `dpkg -l | grep '^rc'` should print nothing.
 
 ---
 
@@ -149,20 +149,22 @@ Then it asks for the sudo username — pre-filled from the existing sudo group o
 
 ## 3/20 — Sudo user
 
-**What it does:** Creates a non-root user (or finds the existing one), adds them to the `sudo` group, prompts for a sudo password if they don't have one, and writes a sudoers drop-in.
+**What it does:** Creates a non-root user (or finds the existing one), adds them to the `sudo` group, prompts for a sudo password if they don't have one, writes a sudoers drop-in, and tightens the user's home directory to `750` (Debian's `adduser` default is `755`, world-readable+executable).
 
 **Files/state changed:**
 - New user account in `/etc/passwd`, `/etc/shadow`
 - Membership in the `sudo` group (`/etc/group`)
 - `/etc/sudoers.d/<username>` containing `<user> ALL=(ALL) ALL`
 - User's password (set interactively if not already set)
+- `/home/<username>` permissions (`755` → `750`)
 
-**Threat model:** Root SSH (next sections) is going away. You need *some* non-root account to log in as. That account needs sudo for admin work. Requiring a password for sudo means a leaked SSH key alone can't escalate to root — the attacker would also need your password.
+**Threat model:** Root SSH (next sections) is going away. You need *some* non-root account to log in as. That account needs sudo for admin work. Requiring a password for sudo means a leaked SSH key alone can't escalate to root — the attacker would also need your password. The home directory tightening is Lynis `HOME-9304` — closes off other local accounts on the same box from browsing into it; low impact on a single-user host, but free and idempotent (only chmods if the mode actually differs).
 
 **Verify after:**
 - `id <username>` shows `sudo` in the group list
 - `cat /etc/sudoers.d/<username>` shows `ALL=(ALL) ALL` (no `NOPASSWD`)
 - `passwd -S <username>` should print `<user> P …` (P = password set)
+- `stat -c '%a' /home/<username>` should print `750`
 
 ---
 

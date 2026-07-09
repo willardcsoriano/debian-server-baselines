@@ -122,6 +122,17 @@ apt-get update -qq
 DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -qq
 pass "All packages updated"
 
+# Purge packages left in 'rc' state (removed but config/cron/init scripts
+# still present) — Lynis PKGS-7346. Only acts if any exist.
+_rc_pkgs=$(dpkg -l | awk '/^rc/ {print $2}')
+if [[ -n "$_rc_pkgs" ]]; then
+  # shellcheck disable=SC2086
+  DEBIAN_FRONTEND=noninteractive dpkg --purge $_rc_pkgs
+  pass "Purged residual config: $_rc_pkgs"
+else
+  pass "No residual (rc-state) packages to purge"
+fi
+
 # ─── 2. Automatic security updates ───────────────────────────────────────────
 
 section "2/20  Automatic security updates"
@@ -139,6 +150,15 @@ else
   pass "User $NEW_USER created"
 fi
 usermod -aG sudo "$NEW_USER"
+
+# Debian's adduser defaults home dirs to 0755 (world-readable+executable).
+# Tighten to 0750 — Lynis HOME-9304. Idempotent: only chmods (and only
+# logs) if the mode actually differs.
+_home_dir="/home/$NEW_USER"
+if [[ -d "$_home_dir" ]] && [[ "$(stat -c '%a' "$_home_dir")" != "750" ]]; then
+  chmod 750 "$_home_dir"
+  note "Tightened $_home_dir to 750"
+fi
 
 # Sudo requires a password — defense in depth so a leaked SSH key alone
 # can't escalate to root. Status "P" means a password is set; anything
@@ -668,8 +688,8 @@ echo -e "${BOLD}  base-server complete${NC}"
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo -e "  ${GREEN}✓${NC} /etc/hosts: 127.0.1.1 → $_hostname (sudo lookup fix)"
-echo -e "  ${GREEN}✓${NC} System updated + auto security patches"
-echo -e "  ${GREEN}✓${NC} Sudo user: ${BOLD}$NEW_USER${NC}"
+echo -e "  ${GREEN}✓${NC} System updated + auto security patches + rc-state packages purged"
+echo -e "  ${GREEN}✓${NC} Sudo user: ${BOLD}$NEW_USER${NC} (home dir 750)"
 echo -e "  ${GREEN}✓${NC} SSH: root off, key-only, restricted forwarding"
 echo -e "  ${GREEN}✓${NC} Firewall: 22, 80, 443 open — all else denied"
 echo -e "  ${GREEN}✓${NC} fail2ban: brute-force protection active"
