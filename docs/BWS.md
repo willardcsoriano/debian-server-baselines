@@ -2,7 +2,7 @@
 
 ## Overview
 
-`bws` is the CLI for Bitwarden **Secrets Manager** — a separate product from the regular Bitwarden password vault, meant for machine/service credentials (registry PATs, API keys, DB passwords) rather than personal logins. `prod-server.sh` and `dev-server.sh` both install it so deploy-time secrets never have to sit in a plaintext `.env` file or get typed into an interactive prompt that persists to disk. This doc covers the one-time web-vault setup (project, machine account, access token — none of which the CLI itself can bootstrap), the core `project`/`secret`/`run` commands, and the two patterns this repo actually uses them for: authenticating to a container registry without persisting the credential, and injecting Compose secrets without a checked-in `.env`. If you're looking for the personal-vault CLI instead (unlocking your own vault, `bw get item`, etc.), that's `bw` — a different binary, installed alongside `bws` but unrelated to it.
+`bws` is the CLI for Bitwarden **Secrets Manager** — a separate product from the regular Bitwarden password vault, meant for machine/service credentials (registry PATs, API keys, DB passwords) rather than personal logins. `prod.sh` and `dev.sh` both install it so deploy-time secrets never have to sit in a plaintext `.env` file or get typed into an interactive prompt that persists to disk. This doc covers the one-time web-vault setup (project, machine account, access token — none of which the CLI itself can bootstrap), the core `project`/`secret`/`run` commands, and the two patterns this repo actually uses them for: authenticating to a container registry without persisting the credential, and injecting Compose secrets without a checked-in `.env`. If you're looking for the personal-vault CLI instead (unlocking your own vault, `bw get item`, etc.), that's `bw` — a different binary, installed alongside `bws` but unrelated to it.
 
 ## Table of Contents
 
@@ -146,4 +146,4 @@ bws secret list <project-id> --output table
 
 ## Where this fits in the repo
 
-`bws` is installed identically by `prod-server.sh` (§2/2) and `dev-server.sh` (§7/8) — intentionally duplicated per this repo's no-shared-`lib/` install model (see [`CLAUDE.md`](../CLAUDE.md) editing guardrails). `DRIFTCHECK.md` tracks keeping both copies in sync. This doc is the "how do I actually use the thing" reference; `DRIFTCHECK.md` is "how do I keep the install steps from drifting between the two scripts."
+`bws` is installed identically by `prod.sh` (§2/2) and `dev.sh` (§7/8) — intentionally duplicated per this repo's no-shared-`lib/` install model (see [`CLAUDE.md`](../CLAUDE.md) editing guardrails). `DRIFTCHECK.md` tracks keeping both copies in sync. This doc is the "how do I actually use the thing" reference; `DRIFTCHECK.md` is "how do I keep the install steps from drifting between the two scripts."

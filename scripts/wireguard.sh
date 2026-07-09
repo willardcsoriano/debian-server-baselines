@@ -15,8 +15,8 @@ note()    { echo -e "  ${DIM}$1${NC}"; }
 # ─── Preflight ────────────────────────────────────────────────────────────────
 
 clear
-echo -e "${BOLD}wireguard-baseline${NC}"
-echo -e "${DIM}WireGuard peer — run as root, after base-server${NC}"
+echo -e "${BOLD}wireguard.sh${NC}"
+echo -e "${DIM}WireGuard peer — run as root, after base.sh${NC}"
 echo ""
 
 [[ $EUID -ne 0 ]] && fail "Must run as root (or via sudo)."
@@ -30,9 +30,9 @@ SERVER_IP=$(hostname -I | awk '{print $1}')
 pass "Debian $VERSION_ID ($VERSION_CODENAME) on $SERVER_IP"
 
 grep -q "^PermitRootLogin no" /etc/ssh/sshd_config 2>/dev/null \
-  || fail "base-server.sh has not run on this host (PermitRootLogin still on)."
+  || fail "base.sh has not run on this host (PermitRootLogin still on)."
 systemctl is-active --quiet ufw \
-  || fail "base-server.sh has not run on this host (UFW not active)."
+  || fail "base.sh has not run on this host (UFW not active)."
 
 WG_CONF="/etc/wireguard/wg0.conf"
 WG_PUB="/etc/wireguard/publickey"
@@ -137,7 +137,7 @@ section "2/3  wg0 config"
 
 if [[ $RERUN -eq 0 ]]; then
   cat > "$WG_CONF" <<EOF
-# Managed by wireguard-baseline — wg0 interface config.
+# Managed by wireguard.sh — wg0 interface config.
 [Interface]
 PrivateKey = $(cat /etc/wireguard/privatekey)
 Address = ${OVERLAY_IP}
@@ -189,7 +189,7 @@ fi
 
 echo ""
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}  wireguard-baseline complete${NC}"
+echo -e "${BOLD}  wireguard.sh complete${NC}"
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo -e "  ${GREEN}✓${NC} Interface: ${BOLD}wg0${NC} — overlay ${BOLD}${OVERLAY_IP}${NC}, port ${BOLD}${LISTEN_PORT}/udp${NC}"

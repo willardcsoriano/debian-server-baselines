@@ -2,7 +2,7 @@
 
 ## Overview
 
-A hardened host running `base-server` exposes a latent permission bug in any Docker workflow that bind-mounts host source into a container and runs the container process as a non-root user with a UID different from the host owner. The hardening step at `base-server.sh` line 485 sets `UMASK 027` in `/etc/login.defs`; Debian's default `USERGROUPS_ENAB yes` collapses that to an effective umask of `0007` for normal users. New files in the developer's home tree are created mode `660`, directories mode `770`, with no permissions for "other". Containers whose service user does not have a UID matching the host owner are "other" to the bind-mounted tree and receive `EACCES` on every read. The behavior is correct given the policy; it is the silent surprise that warrants documentation. This report describes the failure mode observed on `acme`, the workaround applied downstream, and what `base-server` could add to flag the interaction for future users.
+A hardened host running `base.sh` exposes a latent permission bug in any Docker workflow that bind-mounts host source into a container and runs the container process as a non-root user with a UID different from the host owner. The hardening step at `base.sh` line 529 sets `UMASK 027` in `/etc/login.defs`; Debian's default `USERGROUPS_ENAB yes` collapses that to an effective umask of `0007` for normal users. New files in the developer's home tree are created mode `660`, directories mode `770`, with no permissions for "other". Containers whose service user does not have a UID matching the host owner are "other" to the bind-mounted tree and receive `EACCES` on every read. The behavior is correct given the policy; it is the silent surprise that warrants documentation. This report describes the failure mode observed on `acme`, the workaround applied downstream, and what `base.sh` could add to flag the interaction for future users.
 
 ## Table of Contents
 
@@ -11,7 +11,7 @@ A hardened host running `base-server` exposes a latent permission bug in any Doc
 - [Root cause: a three-way collision](#root-cause-a-three-way-collision)
 - [Why it surfaces specifically on a hardened box](#why-it-surfaces-specifically-on-a-hardened-box)
 - [Workaround applied downstream](#workaround-applied-downstream)
-- [What `base-server` could add](#what-base-server-could-add)
+- [What `base.sh` could add](#what-basesh-could-add)
 - [Appendix: reproducer](#appendix-reproducer)
 - [References](#references)
 
@@ -34,7 +34,7 @@ The bug requires three independent design choices to intersect. Two of them are 
 
 | Piece | Stock Debian / stock setup | Hardened machine (cause of breakage) |
 |---|---|---|
-| Host umask | `0022` — new files `644`, new dirs `755`. "Other" can read everything. | `0007` — new files `660`, new dirs `770`. "Other" gets nothing. Produced by `base-server.sh:485` (`UMASK 027` in `/etc/login.defs`) collapsed via Debian's `USERGROUPS_ENAB yes`. |
+| Host umask | `0022` — new files `644`, new dirs `755`. "Other" can read everything. | `0007` — new files `660`, new dirs `770`. "Other" gets nothing. Produced by `base.sh:529` (`UMASK 027` in `/etc/login.defs`) collapsed via Debian's `USERGROUPS_ENAB yes`. |
 | PHP-FPM container UID | `www-data` is UID 33 — "other" to host files. | `www-data` is remapped to UID 1000 in the project's `Dockerfile` via `usermod -u 1000 www-data`. Matches host owner, so PHP-FPM is "owner" on every file. |
 | Nginx container UID | `nginx` is UID 101 inside `nginx:1.27-alpine` — "other" to host files. | Same — the upstream image was pulled with no UID remap. Works fine on a stock-umask host (`644`/`755` is world-readable). Fails under `umask 0007` because "other" has no permissions. |
 
@@ -57,7 +57,7 @@ The interaction is not limited to nginx. Any container that:
 - runs its service process as a non-root user, and
 - has that user's UID mismatched with the host owner
 
-will hit the same failure on a `base-server` host. Common candidates include `node`, `python`, `ruby`, `golang`, `caddy`, `traefik`, and most database images when used with host-mounted data directories.
+will hit the same failure on a `base.sh` host. Common candidates include `node`, `python`, `ruby`, `golang`, `caddy`, `traefik`, and most database images when used with host-mounted data directories.
 
 ## Workaround applied downstream
 
@@ -80,7 +80,7 @@ RUN apk add --no-cache --virtual .uid-fix shadow \
 
 After rebuild, `curl -sI http://localhost:8080/` returned `200 OK`. The hardening (`umask 0007`) was kept untouched.
 
-## What `base-server` could add
+## What `base.sh` could add
 
 The hardening choice is correct and should not be changed. The gap is documentation: a downstream user with a Docker workflow has no warning that this class of bug will appear, and the diagnostic path (nginx `EACCES`, no obvious connection to `login.defs`) is long.
 
@@ -92,7 +92,7 @@ Suggested additions, in increasing order of intervention:
 
 3. **An optional `DRIFTCHECK.md` entry** that lints for `/etc/login.defs` `UMASK` value versus actual effective `umask` of the sudo user, flagging the `USERGROUPS_ENAB` collapse so operators understand what their users will actually see.
 
-4. **A `base-server.sh` summary line** in the post-install report noting the effective umask the sudo user will get, not just the policy value written. Right now the summary says "Password aging + umask 027 ..."; the value `027` is technically accurate but operationally misleading because the user's shells will report `0007`.
+4. **A `base.sh` summary line** in the post-install report noting the effective umask the sudo user will get, not just the policy value written. Right now the summary says "Password aging + umask 027 ..."; the value `027` is technically accurate but operationally misleading because the user's shells will report `0007`.
 
 The first item is probably enough on its own. The remaining items are nice-to-have if the project wants to make the interaction explicit at every layer the operator might inspect.
 
@@ -114,8 +114,8 @@ stat -c '%a %U:%G %n' /tmp/repro /tmp/repro/file   # 770 / 660
 
 ## References
 
-- `base-server.sh:485` — `set_login_def UMASK 027`
-- `/etc/login.defs` — `USERGROUPS_ENAB yes` (Debian default, unchanged by `base-server.sh`)
+- `base.sh:529` — `set_login_def UMASK 027`
+- `/etc/login.defs` — `USERGROUPS_ENAB yes` (Debian default, unchanged by `base.sh`)
 - `login.defs(5)` — documents the `USERGROUPS_ENAB` collapse behavior
 - Downstream project Dockerfile (`acme/Dockerfile`) — pre-existing `www-data` remap that demonstrates the correct pattern
 - Downstream nginx Dockerfile (`acme/docker/nginx/Dockerfile`) — the new remap that closes the gap

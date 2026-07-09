@@ -15,13 +15,13 @@ note()    { echo -e "  ${DIM}$1${NC}"; }
 # ─── Preflight ────────────────────────────────────────────────────────────────
 
 clear
-echo -e "${BOLD}debian-prod-server${NC}"
+echo -e "${BOLD}prod.sh${NC}"
 echo -e "${DIM}Debian 13 prod host — container runtime only, no dev tooling${NC}"
 echo ""
 
 # Must run as the sudo user, NOT root.  Rootless Docker installs per-user;
 # running as root silently breaks the entire workflow.
-[[ $EUID -eq 0 ]] && fail "Run as your sudo user, not root.  Try: bash scripts/prod-server.sh"
+[[ $EUID -eq 0 ]] && fail "Run as your sudo user, not root.  Try: bash scripts/prod.sh"
 
 [[ -f /etc/os-release ]] || fail "Cannot detect OS."
 # shellcheck source=/dev/null
@@ -34,13 +34,13 @@ pass "Debian $VERSION_ID ($VERSION_CODENAME) on $SERVER_IP"
 
 # Confirm user has sudo access
 groups | grep -qw sudo \
-  || fail "$USER is not in the sudo group. Run base-server.sh first."
+  || fail "$USER is not in the sudo group. Run base.sh first."
 
-# Confirm base-server.sh has run: root SSH is off and firewall is active
+# Confirm base.sh has run: root SSH is off and firewall is active
 grep -q "^PermitRootLogin no" /etc/ssh/sshd_config 2>/dev/null \
-  || fail "base-server.sh has not run on this host (PermitRootLogin still on)."
+  || fail "base.sh has not run on this host (PermitRootLogin still on)."
 systemctl is-active --quiet ufw \
-  || fail "base-server.sh has not run on this host (UFW not active)."
+  || fail "base.sh has not run on this host (UFW not active)."
 
 # Confirm a user session is live — required by rootless Docker's systemd user
 # daemon.  An SSH login gives you one automatically.  Running via sudo -s or su
@@ -62,7 +62,7 @@ section "1/2  Docker Engine (rootless) + Compose"
 #   https://docs.docker.com/engine/install/debian/
 #   https://docs.docker.com/engine/security/rootless/
 # Last verified: 2026-05-19
-# NOTE: this block is intentionally duplicated in dev-server.sh — the repo
+# NOTE: this block is intentionally duplicated in dev.sh — the repo
 # ships scripts via curl|bash (one link per script, no clone), so a shared
 # lib/ helper would break the install model.  Keep both copies in sync;
 # DRIFTCHECK.md tracks the canonical Docker source.
@@ -155,7 +155,7 @@ section "2/2  Bitwarden Secrets Manager CLI (bws)"
 # Verify if Bitwarden ships an official install script or moves the repo:
 #   https://bitwarden.com/help/secrets-manager-cli/
 #   https://github.com/bitwarden/sdk-sm/releases
-# NOTE: this block is intentionally duplicated in dev-server.sh (section
+# NOTE: this block is intentionally duplicated in dev.sh (section
 # 7/8) — the repo ships scripts via curl|bash (one link per script, no
 # clone), so a shared lib/ helper would break the install model.  Keep both
 # copies in sync; DRIFTCHECK.md tracks the canonical bws source.
@@ -208,7 +208,7 @@ fi
 
 echo ""
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}  debian-prod-server complete${NC}"
+echo -e "${BOLD}  prod.sh complete${NC}"
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo -e "  ${GREEN}✓${NC} Docker: rootless + Compose, user daemon enabled, linger on"

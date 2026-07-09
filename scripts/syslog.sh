@@ -15,8 +15,8 @@ note()    { echo -e "  ${DIM}$1${NC}"; }
 # ─── Preflight ────────────────────────────────────────────────────────────────
 
 clear
-echo -e "${BOLD}syslog-baseline${NC}"
-echo -e "${DIM}Debian 13 syslog receiver — run as root, after base-server${NC}"
+echo -e "${BOLD}syslog.sh${NC}"
+echo -e "${DIM}Debian 13 syslog receiver — run as root, after base.sh${NC}"
 echo ""
 
 [[ $EUID -ne 0 ]] && fail "Must run as root (or via sudo)."
@@ -29,13 +29,13 @@ echo ""
 SERVER_IP=$(hostname -I | awk '{print $1}')
 pass "Debian $VERSION_ID ($VERSION_CODENAME) on $SERVER_IP"
 
-# Confirm base-server.sh has run
+# Confirm base.sh has run
 grep -q "^PermitRootLogin no" /etc/ssh/sshd_config 2>/dev/null \
-  || fail "base-server.sh has not run on this host (PermitRootLogin still on)."
+  || fail "base.sh has not run on this host (PermitRootLogin still on)."
 systemctl is-active --quiet ufw \
-  || fail "base-server.sh has not run on this host (UFW not active)."
+  || fail "base.sh has not run on this host (UFW not active)."
 
-# rsyslog ships with Debian and base-server.sh does not remove it, but
+# rsyslog ships with Debian and base.sh does not remove it, but
 # confirm it is present before modifying its config.
 command -v rsyslogd &>/dev/null \
   || fail "rsyslogd not found — install rsyslog and re-run."
@@ -53,7 +53,7 @@ echo ""
 
 # SYSLOG_ALLOW_FROM can be set in the environment to skip the prompt, which is
 # useful when running via curl | bash with a WireGuard or private-network CIDR:
-#   SYSLOG_ALLOW_FROM=10.20.0.0/24 sudo bash scripts/syslog-baseline.sh
+#   SYSLOG_ALLOW_FROM=10.20.0.0/24 sudo bash scripts/syslog.sh
 if [[ -z "${SYSLOG_ALLOW_FROM:-}" ]]; then
   [[ -t 0 || -r /dev/tty ]] || fail "No tty — set SYSLOG_ALLOW_FROM=<cidr> in the environment or run interactively."
   read -rp "  Restrict 514/tcp to CIDR (e.g. 10.20.0.0/24, blank = allow all): " SYSLOG_ALLOW_FROM </dev/tty
@@ -75,7 +75,7 @@ chown syslog:adm /var/log/remote
 chmod 750 /var/log/remote
 
 cat > /etc/rsyslog.d/50-receiver.conf <<'EOF'
-# Managed by syslog-baseline — receives remote syslog over TCP port 514.
+# Managed by syslog.sh — receives remote syslog over TCP port 514.
 
 module(load="imtcp")
 
@@ -115,7 +115,7 @@ pass "rsyslog receiving on TCP 514 — /var/log/remote/<hostname>/<program>.log"
 
 section "2/3  Firewall (UFW 514/tcp)"
 
-# sender side (base-server.sh section 20) forwards over TCP (@@).
+# sender side (base.sh section 20) forwards over TCP (@@).
 # Only TCP is opened here — UDP syslog is fire-and-forget with no delivery guarantee.
 if [[ -n "$SYSLOG_ALLOW_FROM" ]]; then
   ufw allow from "$SYSLOG_ALLOW_FROM" to any port 514 proto tcp > /dev/null
@@ -130,7 +130,7 @@ fi
 section "3/3  Log rotation"
 
 cat > /etc/logrotate.d/remote-syslog <<'EOF'
-# Managed by syslog-baseline.
+# Managed by syslog.sh.
 /var/log/remote/*/*.log {
     weekly
     rotate 12
@@ -152,7 +152,7 @@ pass "logrotate: weekly rotation, 12-week retention, 500M maxsize, compressed"
 
 echo ""
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BOLD}  syslog-baseline complete${NC}"
+echo -e "${BOLD}  syslog.sh complete${NC}"
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 echo -e "  ${GREEN}✓${NC} rsyslog: receiving on TCP 514"
@@ -166,7 +166,7 @@ echo -e "  ${GREEN}✓${NC} logrotate: weekly, 12-week retention, 500M maxsize, 
 echo ""
 echo -e "  Point senders at: ${BOLD}$SERVER_IP:514${NC}"
 echo -e "  ${DIM}(If using WireGuard, use this host's WireGuard IP instead of the above.)${NC}"
-echo -e "  On each sender, answer the remote syslog prompt in base-server.sh"
+echo -e "  On each sender, answer the remote syslog prompt in base.sh"
 echo -e "  or set it manually in /etc/rsyslog.d/50-remote-syslog.conf."
 echo -e "  ${DIM}This script is idempotent — re-run anytime to refresh.${NC}"
 echo ""
