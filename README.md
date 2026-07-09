@@ -69,9 +69,9 @@ Most hardening scripts lock your server and disappear. This one installs the too
 
 | Step | What |
 |---|---|
-| System updates | Upgrades all installed packages to current versions |
+| System updates | Upgrades all installed packages to current versions, purges any packages left in `rc` state (removed but config/cron/init scripts still present) |
 | Automatic security updates | Installs `unattended-upgrades` so security patches apply on their own |
-| Sudo user | Creates a non-root account and prompts for a sudo password (defense in depth — leaked SSH key alone can't escalate) |
+| Sudo user | Creates a non-root account and prompts for a sudo password (defense in depth — leaked SSH key alone can't escalate); home directory tightened to `750` |
 | SSH key | Copies `/root/.ssh/authorized_keys` to the new user |
 | SSH hardening | Disables root login and password auth, key-only, restricts forwarding/sessions |
 | Firewall | UFW — ports 22, 80, 443 open; everything else denied |
