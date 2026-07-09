@@ -38,7 +38,7 @@ Tell the agent: `check @DRIFTCHECK.md` or `run the drift check`. The agent fetch
 - Setup command: `dockerd-rootless-setuptool.sh install`
 - Socket path: `unix:///run/user/$(id -u)/docker.sock`
 - Whether `docker-ce-rootless-extras` is still the package providing the setup tool
-- **Drift between the two copies.** `diff <(sed -n '/^# DRIFT: apt repo format/,/^pass "Docker/p' prod-server.sh) <(sed -n '/^# DRIFT: apt repo format/,/^pass "Docker/p' dev-server.sh)` should be empty except the `NOTE:` line's cross-referenced filename (each file names the *other* one — expected, not drift). Anchor on the literal `# DRIFT: apt repo format` / `pass "Docker` text, not a bare `/^# DRIFT:/,/^pass /p` — both scripts now contain multiple `# DRIFT:`/`pass` pairs, and a bare pattern re-triggers on every one instead of isolating Docker's block, producing false-positive diffs.
+- **Drift between the two copies.** `diff <(sed -n '/^# DRIFT: apt repo format/,/^pass "Docker/p' scripts/prod-server.sh) <(sed -n '/^# DRIFT: apt repo format/,/^pass "Docker/p' scripts/dev-server.sh)` should be empty except the `NOTE:` line's cross-referenced filename (each file names the *other* one — expected, not drift). Anchor on the literal `# DRIFT: apt repo format` / `pass "Docker` text, not a bare `/^# DRIFT:/,/^pass /p` — both scripts now contain multiple `# DRIFT:`/`pass` pairs, and a bare pattern re-triggers on every one instead of isolating Docker's block, producing false-positive diffs.
 
 **Report:** any package renamed, any URL changed, any flag removed or added, any new prerequisite. If a change is needed, propose it for **both** scripts in the same commit.
 
@@ -58,8 +58,8 @@ Tell the agent: `check @DRIFTCHECK.md` or `run the drift check`. The agent fetch
 - Checksum file naming (`bws-sha256-checksums-<version>.txt`) and that sha256 verification still gates the install before `unzip`
 - Whether Bitwarden has published an official install script that would replace this manual zip/checksum dance
 - Whether `bws run --project-id <id> -- <cmd>` (the no-disk secrets-injection pattern documented in README.md) is still current syntax
-- **Drift in the DRIFT comment.** `diff <(sed -n '/^# DRIFT: bws is published/,/^# Last verified:/p' prod-server.sh) <(sed -n '/^# DRIFT: bws is published/,/^# Last verified:/p' dev-server.sh)` should be empty except the `NOTE:` line's cross-referenced section number (`2/2` vs `7/8` is expected, not drift).
-- **Drift in the install logic.** `diff <(sed -n '/^if command -v bws/,/^fi$/p' prod-server.sh) <(sed -n '/^if command -v bws/,/^fi$/p' dev-server.sh)` should be byte-identical (empty diff). If it isn't, someone updated one copy's install logic and forgot the other.
+- **Drift in the DRIFT comment.** `diff <(sed -n '/^# DRIFT: bws is published/,/^# Last verified:/p' scripts/prod-server.sh) <(sed -n '/^# DRIFT: bws is published/,/^# Last verified:/p' scripts/dev-server.sh)` should be empty except the `NOTE:` line's cross-referenced section number (`2/2` vs `7/8` is expected, not drift).
+- **Drift in the install logic.** `diff <(sed -n '/^if command -v bws/,/^fi$/p' scripts/prod-server.sh) <(sed -n '/^if command -v bws/,/^fi$/p' scripts/dev-server.sh)` should be byte-identical (empty diff). If it isn't, someone updated one copy's install logic and forgot the other.
 
 **Report:** any tag/asset/checksum naming change, any new official install method, any `bws run` syntax change, or drift between the two copies. If a change is needed, propose it for **both** scripts in the same commit.
 
@@ -139,25 +139,25 @@ Run these locally — they catch internal drift without network calls:
 
 ```bash
 # Syntax
-bash -n base-server.sh prod-server.sh dev-server.sh syslog-baseline.sh wireguard-baseline.sh
+bash -n scripts/base-server.sh scripts/prod-server.sh scripts/dev-server.sh scripts/syslog-baseline.sh scripts/wireguard-baseline.sh
 
 # Static analysis
-shellcheck base-server.sh prod-server.sh dev-server.sh syslog-baseline.sh wireguard-baseline.sh
+shellcheck scripts/base-server.sh scripts/prod-server.sh scripts/dev-server.sh scripts/syslog-baseline.sh scripts/wireguard-baseline.sh
 
 # Base script section count (should still be 20)
-grep -c 'section "' base-server.sh
-grep -oP '\d+(?=/)' base-server.sh | sort -n | uniq | tail -1   # highest N in N/20
+grep -c 'section "' scripts/base-server.sh
+grep -oP '\d+(?=/)' scripts/base-server.sh | sort -n | uniq | tail -1   # highest N in N/20
 
 # prod-server section count (should still be 2)
-grep -c 'section "' prod-server.sh
-grep -oP '\d+(?=/2)' prod-server.sh | sort -n | uniq | tail -1             # highest N in N/2
+grep -c 'section "' scripts/prod-server.sh
+grep -oP '\d+(?=/2)' scripts/prod-server.sh | sort -n | uniq | tail -1             # highest N in N/2
 
 # dev-server section count (should still be 8)
-grep -c 'section "' dev-server.sh
-grep -oP '\d+(?=/8)' dev-server.sh | sort -n | uniq | tail -1              # highest N in N/8
+grep -c 'section "' scripts/dev-server.sh
+grep -oP '\d+(?=/8)' scripts/dev-server.sh | sort -n | uniq | tail -1              # highest N in N/8
 
 # Summary block matches section count
-grep -c '✓\|✗\|–' base-server.sh | tail -1
+grep -c '✓\|✗\|–' scripts/base-server.sh | tail -1
 ```
 
 ---

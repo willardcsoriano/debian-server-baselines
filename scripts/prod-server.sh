@@ -21,7 +21,7 @@ echo ""
 
 # Must run as the sudo user, NOT root.  Rootless Docker installs per-user;
 # running as root silently breaks the entire workflow.
-[[ $EUID -eq 0 ]] && fail "Run as your sudo user, not root.  Try: bash prod-server.sh"
+[[ $EUID -eq 0 ]] && fail "Run as your sudo user, not root.  Try: bash scripts/prod-server.sh"
 
 [[ -f /etc/os-release ]] || fail "Cannot detect OS."
 # shellcheck source=/dev/null

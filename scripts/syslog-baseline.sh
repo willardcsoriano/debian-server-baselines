@@ -53,7 +53,7 @@ echo ""
 
 # SYSLOG_ALLOW_FROM can be set in the environment to skip the prompt, which is
 # useful when running via curl | bash with a WireGuard or private-network CIDR:
-#   SYSLOG_ALLOW_FROM=10.20.0.0/24 sudo bash syslog-baseline.sh
+#   SYSLOG_ALLOW_FROM=10.20.0.0/24 sudo bash scripts/syslog-baseline.sh
 if [[ -z "${SYSLOG_ALLOW_FROM:-}" ]]; then
   [[ -t 0 || -r /dev/tty ]] || fail "No tty — set SYSLOG_ALLOW_FROM=<cidr> in the environment or run interactively."
   read -rp "  Restrict 514/tcp to CIDR (e.g. 10.20.0.0/24, blank = allow all): " SYSLOG_ALLOW_FROM </dev/tty

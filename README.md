@@ -4,11 +4,11 @@
 
 | Script | Command | Purpose |
 |---|---|---|
-| Base | `sudo bash base-server.sh` | SSH, UFW, fail2ban, auditd, AIDE, AppArmor, Lynis — every server first |
-| Prod | `bash prod-server.sh` | Rootless Docker + Compose, Bitwarden secrets CLI — container-only prod hosts |
-| Dev | `bash dev-server.sh` | Node, Claude Code CLI, `gh`, `make`, Bitwarden — developer workstation |
-| Syslog | `sudo bash syslog-baseline.sh` | rsyslog TCP 514 receiver, per-sender log buckets — central log host |
-| WireGuard | `sudo bash wireguard-baseline.sh` | WireGuard keypair + peer management — server-to-server tunnel |
+| Base | `sudo bash scripts/base-server.sh` | SSH, UFW, fail2ban, auditd, AIDE, AppArmor, Lynis — every server first |
+| Prod | `bash scripts/prod-server.sh` | Rootless Docker + Compose, Bitwarden secrets CLI — container-only prod hosts |
+| Dev | `bash scripts/dev-server.sh` | Node, Claude Code CLI, `gh`, `make`, Bitwarden — developer workstation |
+| Syslog | `sudo bash scripts/syslog-baseline.sh` | rsyslog TCP 514 receiver, per-sender log buckets — central log host |
+| WireGuard | `sudo bash scripts/wireguard-baseline.sh` | WireGuard keypair + peer management — server-to-server tunnel |
 
 ## Overview
 
@@ -38,19 +38,19 @@ Every script reads its prompts from `/dev/tty`, so both paths below behave ident
 
 ```bash
 # base — run as root:
-curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baselines/main/base-server.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baselines/main/scripts/base-server.sh | sudo bash
 
 # prod — run as your sudo user (no sudo):
-curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baselines/main/prod-server.sh | bash
+curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baselines/main/scripts/prod-server.sh | bash
 
 # dev — run as your sudo user (no sudo):
-curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baselines/main/dev-server.sh | bash
+curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baselines/main/scripts/dev-server.sh | bash
 
 # syslog — run as root:
-curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baselines/main/syslog-baseline.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baselines/main/scripts/syslog-baseline.sh | sudo bash
 
 # wireguard — run as root:
-curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baselines/main/wireguard-baseline.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baselines/main/scripts/wireguard-baseline.sh | sudo bash
 ```
 
 **Private repo — clone, then run locally:**
@@ -58,7 +58,7 @@ curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-basel
 ```bash
 git clone git@github.com:willardcsoriano/debian-server-baselines.git
 cd debian-server-baselines
-sudo bash base-server.sh   # or, as your sudo user:  bash dev-server.sh
+sudo bash scripts/base-server.sh   # or, as your sudo user:  bash scripts/dev-server.sh
 ```
 
 ## What the base does
@@ -106,7 +106,7 @@ The base hardens any server type. Role scripts layer the tooling each kind of se
 ### prod-server.sh — container-only prod hosts
 
 ```bash
-bash prod-server.sh
+bash scripts/prod-server.sh
 ```
 
 Installs rootless Docker + Compose v2, plus the Bitwarden Secrets Manager CLI (`bws`) for pulling deploy secrets without storing them in a plaintext `.env` on disk. Disables the system-mode Docker daemon (rootless replaces it), allocates `subuid`/`subgid`, enables linger so the user daemon survives logout, exports `DOCKER_HOST` in `~/.bashrc`. No Node, no language toolchains — apps deploy as container images pulled from a registry. After install: `docker login ghcr.io` (or your registry of choice) — note this persists a credential to `~/.docker/config.json` (base64, not encrypted), so for a leaner footprint wrap it with `bws` and `docker logout` instead of leaving it logged in indefinitely. Then inject secrets at deploy time instead of committing them to disk:
@@ -119,7 +119,7 @@ bws run --project-id <project-id> -- docker compose up -d
 ### dev-server.sh — developer workstation
 
 ```bash
-bash dev-server.sh
+bash scripts/dev-server.sh
 ```
 
 Same Docker setup as `prod-server.sh`, plus:
@@ -136,7 +136,7 @@ Same Docker setup as `prod-server.sh`, plus:
 ### syslog-baseline.sh — central log receiver
 
 ```bash
-sudo bash syslog-baseline.sh
+sudo bash scripts/syslog-baseline.sh
 ```
 
 Turns this host into a central log receiver: enables rsyslog's `imtcp` listener on TCP 514, opens 514/tcp in UFW (optionally restricted to a sender CIDR), and writes each sender's messages to `/var/log/remote/<hostname>/<program>.log` with weekly logrotate (12-week retention, 500M maxsize, compressed). Uses a dedicated `remote-tcp` ruleset with `SecurePath="replace"` so hostile senders can't write outside the bucket. Point the section 20 prompt of `base-server.sh` on each sender at this server's IP (or WireGuard overlay IP) and the logs land here automatically.
@@ -144,13 +144,13 @@ Turns this host into a central log receiver: enables rsyslog's `imtcp` listener 
 Prompts for a CIDR to restrict 514/tcp (e.g. `10.20.0.0/24` for a WireGuard subnet). Leave blank to allow all sources. Can also be set via env var:
 
 ```bash
-SYSLOG_ALLOW_FROM=10.20.0.0/24 sudo bash syslog-baseline.sh
+SYSLOG_ALLOW_FROM=10.20.0.0/24 sudo bash scripts/syslog-baseline.sh
 ```
 
 ### wireguard-baseline.sh — server-to-server tunnel
 
 ```bash
-sudo bash wireguard-baseline.sh
+sudo bash scripts/wireguard-baseline.sh
 ```
 
 Sets up this host as a WireGuard peer: generates a keypair, writes `/etc/wireguard/wg0.conf`, opens the listen port in UFW, and enables `wg-quick@wg0`. On first run prompts for the host's overlay IP (e.g. `10.20.0.1/24`), listen port (default 51820), IP forwarding opt-in, and the first peer's details. Re-run anytime to add more peers or retrieve the public key — the script always prints the public key in the summary so you never have to dig through config files.

@@ -21,7 +21,7 @@ echo ""
 
 # Must run as the sudo user, NOT root.  Rootless Docker, nvm, and Claude Code
 # install per-user; running as root silently breaks the entire workflow.
-[[ $EUID -eq 0 ]] && fail "Run as your sudo user, not root.  Try: bash dev-server.sh"
+[[ $EUID -eq 0 ]] && fail "Run as your sudo user, not root.  Try: bash scripts/dev-server.sh"
 
 [[ -f /etc/os-release ]] || fail "Cannot detect OS."
 # shellcheck source=/dev/null
