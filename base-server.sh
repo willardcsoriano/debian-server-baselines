@@ -410,7 +410,7 @@ fi
 # ─── 12. rkhunter + auditd ───────────────────────────────────────────────────
 
 section "12/20 Intrusion detection (rkhunter + auditd + AIDE)"
-DEBIAN_FRONTEND=noninteractive apt-get install -y -qq rkhunter auditd aide
+DEBIAN_FRONTEND=noninteractive apt-get install -y -qq rkhunter auditd aide aide-common
 rkhunter --update --quiet 2>/dev/null || true
 if [[ ! -f /var/lib/rkhunter/db/rkhunter.dat ]]; then
   rkhunter --propupd --quiet 2>/dev/null || true
@@ -422,6 +422,8 @@ fi
 # FINT-4350: AIDE for file integrity monitoring. The first init scans the
 # entire filesystem and takes ~30–60s on a clean Debian install. Skip if
 # a database already exists so re-runs don't rebuild from scratch.
+# aideinit (and the config it reads) come from aide-common, not aide itself
+# — both must be installed or this silently produces no database at all.
 if [[ -f /var/lib/aide/aide.db ]] || [[ -f /var/lib/aide/aide.db.gz ]]; then
   pass "AIDE database present (baseline preserved)"
 else
@@ -429,7 +431,11 @@ else
   aideinit --yes --force >/dev/null 2>&1 || aide --init >/dev/null 2>&1 || true
   [[ -f /var/lib/aide/aide.db.new.gz ]] && mv -f /var/lib/aide/aide.db.new.gz /var/lib/aide/aide.db.gz
   [[ -f /var/lib/aide/aide.db.new ]]    && mv -f /var/lib/aide/aide.db.new /var/lib/aide/aide.db
-  pass "AIDE database initialized"
+  if [[ -f /var/lib/aide/aide.db ]] || [[ -f /var/lib/aide/aide.db.gz ]]; then
+    pass "AIDE database initialized"
+  else
+    warn "AIDE database initialization failed — run 'sudo aideinit' manually to diagnose"
+  fi
 fi
 
 systemctl enable --now auditd -q
