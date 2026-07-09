@@ -311,6 +311,10 @@ section "7/8  Bitwarden Secrets Manager CLI (bws)"
 # Verify if Bitwarden ships an official install script or moves the repo:
 #   https://bitwarden.com/help/secrets-manager-cli/
 #   https://github.com/bitwarden/sdk-sm/releases
+# NOTE: this block is intentionally duplicated in prod-server.sh (section
+# 2/2) — the repo ships scripts via curl|bash (one link per script, no
+# clone), so a shared lib/ helper would break the install model.  Keep both
+# copies in sync; DRIFTCHECK.md tracks the canonical bws source.
 # Last verified: 2026-05-22
 
 if command -v bws &>/dev/null; then

@@ -5,7 +5,7 @@
 | Script | Command | Purpose |
 |---|---|---|
 | Base | `sudo bash base-server.sh` | SSH, UFW, fail2ban, auditd, AIDE, AppArmor, Lynis — every server first |
-| Prod | `bash prod-server.sh` | Rootless Docker + Compose — container-only prod hosts |
+| Prod | `bash prod-server.sh` | Rootless Docker + Compose, Bitwarden secrets CLI — container-only prod hosts |
 | Dev | `bash dev-server.sh` | Node, Claude Code CLI, `gh`, `make`, Bitwarden — developer workstation |
 | Syslog | `sudo bash syslog-baseline.sh` | rsyslog TCP 514 receiver, per-sender log buckets — central log host |
 | WireGuard | `sudo bash wireguard-baseline.sh` | WireGuard keypair + peer management — server-to-server tunnel |
@@ -37,14 +37,21 @@ Every script reads its prompts from `/dev/tty`, so both paths below behave ident
 **Public repo — curl straight to bash, nothing to clone:**
 
 ```bash
-# base / syslog / wireguard — run as root:
+# base — run as root:
 curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baselines/main/base-server.sh | sudo bash
 
-# prod / dev — run as your sudo user (no sudo):
-curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baselines/main/dev-server.sh | bash
-```
+# prod — run as your sudo user (no sudo):
+curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baselines/main/prod-server.sh | bash
 
-Swap the filename for `prod-server.sh`, `syslog-baseline.sh`, or `wireguard-baseline.sh`.
+# dev — run as your sudo user (no sudo):
+curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baselines/main/dev-server.sh | bash
+
+# syslog — run as root:
+curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baselines/main/syslog-baseline.sh | sudo bash
+
+# wireguard — run as root:
+curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baselines/main/wireguard-baseline.sh | sudo bash
+```
 
 **Private repo — clone, then run locally:**
 
@@ -102,7 +109,12 @@ The base hardens any server type. Role scripts layer the tooling each kind of se
 bash prod-server.sh
 ```
 
-Installs rootless Docker + Compose v2 and nothing else. Disables the system-mode Docker daemon (rootless replaces it), allocates `subuid`/`subgid`, enables linger so the user daemon survives logout, exports `DOCKER_HOST` in `~/.bashrc`. No Node, no language toolchains — apps deploy as container images pulled from a registry. After install: `docker login ghcr.io` (or your registry of choice) and you're ready to `docker compose pull && up -d`.
+Installs rootless Docker + Compose v2, plus the Bitwarden Secrets Manager CLI (`bws`) for pulling deploy secrets without storing them in a plaintext `.env` on disk. Disables the system-mode Docker daemon (rootless replaces it), allocates `subuid`/`subgid`, enables linger so the user daemon survives logout, exports `DOCKER_HOST` in `~/.bashrc`. No Node, no language toolchains — apps deploy as container images pulled from a registry. After install: `docker login ghcr.io` (or your registry of choice), then inject secrets at deploy time instead of committing them to disk:
+
+```bash
+export BWS_ACCESS_TOKEN=<machine-account-token>   # from your shell profile or a secret store, never checked in
+bws run --project-id <project-id> -- docker compose up -d
+```
 
 ### dev-server.sh — developer workstation
 

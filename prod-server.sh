@@ -53,9 +53,9 @@ _user_bus="/run/user/$_user_uid/bus"
 pass "Preflight OK — $USER, session confirmed"
 echo ""
 
-# ─── 1/1  Docker Engine (rootless) + Compose ─────────────────────────────────
+# ─── 1/2  Docker Engine (rootless) + Compose ─────────────────────────────────
 
-section "1/1  Docker Engine (rootless) + Compose"
+section "1/2  Docker Engine (rootless) + Compose"
 
 # DRIFT: apt repo format, package names, and rootless install procedure
 # change roughly annually.  Verify before editing:
@@ -143,6 +143,67 @@ fi
 
 pass "Docker (rootless) + Compose installed; user daemon enabled; linger on"
 
+# ─── 2/2  Bitwarden Secrets Manager CLI (bws) ────────────────────────────────
+
+section "2/2  Bitwarden Secrets Manager CLI (bws)"
+
+# DRIFT: bws is published as prebuilt zips on GitHub releases under
+# bitwarden/sdk-sm with tag format bws-vX.Y.Z.  Asset names follow
+# bws-<arch>-unknown-linux-gnu-<version>.zip with a sibling
+# bws-sha256-checksums-<version>.txt.  cargo install bws is a non-starter:
+# this host's compilers are mode 750 (root-only) per the baseline.
+# Verify if Bitwarden ships an official install script or moves the repo:
+#   https://bitwarden.com/help/secrets-manager-cli/
+#   https://github.com/bitwarden/sdk-sm/releases
+# NOTE: this block is intentionally duplicated in dev-server.sh (section
+# 7/8) — the repo ships scripts via curl|bash (one link per script, no
+# clone), so a shared lib/ helper would break the install model.  Keep both
+# copies in sync; DRIFTCHECK.md tracks the canonical bws source.
+# Last verified: 2026-05-22
+
+mkdir -p "$HOME/.local/bin"
+if ! grep -q 'HOME/.local/bin' "$HOME/.bashrc" 2>/dev/null; then
+  cat >> "$HOME/.bashrc" <<'EOF'
+
+# Per-user binaries (bws)
+export PATH="$HOME/.local/bin:$PATH"
+EOF
+fi
+export PATH="$HOME/.local/bin:$PATH"
+
+# unzip is required by the bws install step; apt-get is idempotent.
+sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq unzip
+
+if command -v bws &>/dev/null; then
+  BWS_VER=$(bws --version 2>/dev/null || echo "installed")
+  pass "bws already installed ($BWS_VER)"
+else
+  _bws_tag=$(curl -fsSL https://api.github.com/repos/bitwarden/sdk-sm/releases \
+    | grep -oP '"tag_name":\s*"\Kbws-v[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+  [[ -n "$_bws_tag" ]] || fail "Could not determine latest bws release tag"
+  _bws_ver="${_bws_tag#bws-v}"
+
+  case "$(dpkg --print-architecture)" in
+    amd64) _bws_arch="x86_64-unknown-linux-gnu" ;;
+    arm64) _bws_arch="aarch64-unknown-linux-gnu" ;;
+    *)     fail "Unsupported architecture for bws: $(dpkg --print-architecture)" ;;
+  esac
+  _bws_asset="bws-${_bws_arch}-${_bws_ver}.zip"
+
+  _tmp=$(mktemp -d)
+  curl -fsSL -o "$_tmp/$_bws_asset" \
+    "https://github.com/bitwarden/sdk-sm/releases/download/${_bws_tag}/${_bws_asset}"
+  curl -fsSL -o "$_tmp/checksums.txt" \
+    "https://github.com/bitwarden/sdk-sm/releases/download/${_bws_tag}/bws-sha256-checksums-${_bws_ver}.txt"
+  ( cd "$_tmp" && grep " ${_bws_asset}\$" checksums.txt | sha256sum -c - >/dev/null ) \
+    || fail "bws checksum mismatch for ${_bws_asset}"
+  unzip -q "$_tmp/$_bws_asset" -d "$_tmp"
+  install -m 0755 "$_tmp/bws" "$HOME/.local/bin/bws"
+  rm -rf "$_tmp"
+  BWS_VER=$(bws --version 2>/dev/null || echo "installed")
+  pass "bws installed ($BWS_VER)"
+fi
+
 # ─── Summary ─────────────────────────────────────────────────────────────────
 
 echo ""
@@ -152,9 +213,13 @@ echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 echo -e "  ${GREEN}✓${NC} Docker: rootless + Compose, user daemon enabled, linger on"
 echo -e "  ${GREEN}✓${NC} Unprivileged port 80 enabled for rootless nginx"
+echo -e "  ${GREEN}✓${NC} Bitwarden Secrets Manager CLI: $BWS_VER"
 echo ""
 echo -e "  Log in as: ${BOLD}ssh $USER@$SERVER_IP${NC}"
-echo -e "  ${YELLOW}Reload your shell${NC} (${DIM}exec \$SHELL -l${NC}) to activate DOCKER_HOST."
+echo -e "  ${YELLOW}Reload your shell${NC} (${DIM}exec \$SHELL -l${NC}) to activate DOCKER_HOST and ~/.local/bin."
 echo -e "  ${DIM}Authenticate to your container registry next:${NC} docker login ghcr.io"
+echo -e "  ${DIM}Inject deploy secrets without writing them to disk:${NC}"
+echo -e "  ${DIM}  export BWS_ACCESS_TOKEN=<machine-account-token>   # never checked in${NC}"
+echo -e "  ${DIM}  bws run --project-id <project-id> -- docker compose up -d${NC}"
 echo -e "  ${DIM}This script is idempotent — re-run anytime to refresh.${NC}"
 echo ""
