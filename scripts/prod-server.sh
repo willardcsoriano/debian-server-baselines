@@ -223,5 +223,6 @@ echo -e "  ${DIM}   bws + docker logout if you want nothing sitting on disk betw
 echo -e "  ${DIM}Inject deploy secrets without writing them to disk:${NC}"
 echo -e "  ${DIM}  export BWS_ACCESS_TOKEN=<machine-account-token>   # never checked in${NC}"
 echo -e "  ${DIM}  bws run --project-id <project-id> -- docker compose up -d${NC}"
+echo -e "  ${DIM}Full bws walkthrough: docs/BWS.md${NC}"
 echo -e "  ${DIM}This script is idempotent — re-run anytime to refresh.${NC}"
 echo ""

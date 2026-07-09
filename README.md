@@ -116,6 +116,8 @@ export BWS_ACCESS_TOKEN=<machine-account-token>   # from your shell profile or a
 bws run --project-id <project-id> -- docker compose up -d
 ```
 
+> New to `bws`? See [BWS.md](docs/BWS.md) for the full primer — web-vault setup, command reference, and both patterns above explained.
+
 ### dev-server.sh — developer workstation
 
 ```bash
