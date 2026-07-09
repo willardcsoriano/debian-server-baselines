@@ -86,11 +86,11 @@ The hardening choice is correct and should not be changed. The gap is documentat
 
 Suggested additions, in increasing order of intervention:
 
-1. **A note in `README.md` or `WALKTHROUGH.md`** under a "Known interactions" or "After install" section, calling out that `UMASK 027` + `USERGROUPS_ENAB yes` produces an effective `umask 0007` for normal users, and that this breaks any Docker bind-mount workflow where the container service user has a UID different from the host owner. One paragraph plus a one-line workaround pointer.
+1. **A note in `README.md` or `docs/walkthrough.md`** under a "Known interactions" or "After install" section, calling out that `UMASK 027` + `USERGROUPS_ENAB yes` produces an effective `umask 0007` for normal users, and that this breaks any Docker bind-mount workflow where the container service user has a UID different from the host owner. One paragraph plus a one-line workaround pointer.
 
 2. **A reference example** under a `docs/` or `examples/` path showing the minimal UID-remap pattern (the `apk add shadow && usermod + groupmod + chown` snippet above, plus the Debian-based equivalent). The two flavors of base image differ enough — alpine needs `shadow`, debian-based images already have `usermod` — that an example pays for itself.
 
-3. **An optional `DRIFTCHECK.md` entry** that lints for `/etc/login.defs` `UMASK` value versus actual effective `umask` of the sudo user, flagging the `USERGROUPS_ENAB` collapse so operators understand what their users will actually see.
+3. **An optional `docs/internal/driftcheck.md` entry** that lints for `/etc/login.defs` `UMASK` value versus actual effective `umask` of the sudo user, flagging the `USERGROUPS_ENAB` collapse so operators understand what their users will actually see.
 
 4. **A `base.sh` summary line** in the post-install report noting the effective umask the sudo user will get, not just the policy value written. Right now the summary says "Password aging + umask 027 ..."; the value `027` is technically accurate but operationally misleading because the user's shells will report `0007`.
 

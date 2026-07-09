@@ -146,4 +146,4 @@ bws secret list <project-id> --output table
 
 ## Where this fits in the repo
 
-`bws` is installed identically by `prod.sh` (§2/2) and `dev.sh` (§7/8) — intentionally duplicated per this repo's no-shared-`lib/` install model (see [`CLAUDE.md`](../CLAUDE.md) editing guardrails). `DRIFTCHECK.md` tracks keeping both copies in sync. This doc is the "how do I actually use the thing" reference; `DRIFTCHECK.md` is "how do I keep the install steps from drifting between the two scripts."
+`bws` is installed identically by `prod.sh` (§2/2) and `dev.sh` (§7/8) — intentionally duplicated per this repo's no-shared-`lib/` install model (see [`CLAUDE.md`](../CLAUDE.md) editing guardrails). `driftcheck.md` tracks keeping both copies in sync. This doc is the "how do I actually use the thing" reference; `driftcheck.md` is "how do I keep the install steps from drifting between the two scripts."

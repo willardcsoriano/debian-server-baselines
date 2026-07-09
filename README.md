@@ -65,7 +65,7 @@ sudo bash scripts/base.sh   # or, as your sudo user:  bash scripts/dev.sh
 
 Most hardening scripts lock your server and disappear. This one installs the tools to keep it hardened — so you have ongoing visibility, not just a one-time configuration.
 
-> Want a section-by-section walkthrough with verification commands and threat-model notes? See [WALKTHROUGH.md](docs/WALKTHROUGH.md).
+> Want a section-by-section walkthrough with verification commands and threat-model notes? See [walkthrough.md](docs/walkthrough.md).
 
 | Step | What |
 |---|---|
@@ -116,7 +116,7 @@ export BWS_ACCESS_TOKEN=<machine-account-token>   # from your shell profile or a
 bws run --project-id <project-id> -- docker compose up -d
 ```
 
-> New to `bws`? See [BWS.md](docs/BWS.md) for the full primer — web-vault setup, command reference, and both patterns above explained.
+> New to `bws`? See [bws.md](docs/bws.md) for the full primer — web-vault setup, command reference, and both patterns above explained.
 
 ### dev.sh — developer workstation
 
