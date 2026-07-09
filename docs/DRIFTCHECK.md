@@ -38,7 +38,7 @@ Tell the agent: `check @DRIFTCHECK.md` or `run the drift check`. The agent fetch
 - Setup command: `dockerd-rootless-setuptool.sh install`
 - Socket path: `unix:///run/user/$(id -u)/docker.sock`
 - Whether `docker-ce-rootless-extras` is still the package providing the setup tool
-- **Drift between the two copies.** `diff <(sed -n '/^# DRIFT:/,/^pass /p' prod-server.sh) <(sed -n '/^# DRIFT:/,/^pass /p' dev-server.sh)` should be empty modulo indentation. If it isn't, someone updated one and forgot the other.
+- **Drift between the two copies.** `diff <(sed -n '/^# DRIFT: apt repo format/,/^pass "Docker/p' prod-server.sh) <(sed -n '/^# DRIFT: apt repo format/,/^pass "Docker/p' dev-server.sh)` should be empty except the `NOTE:` line's cross-referenced filename (each file names the *other* one — expected, not drift). Anchor on the literal `# DRIFT: apt repo format` / `pass "Docker` text, not a bare `/^# DRIFT:/,/^pass /p` — both scripts now contain multiple `# DRIFT:`/`pass` pairs, and a bare pattern re-triggers on every one instead of isolating Docker's block, producing false-positive diffs.
 
 **Report:** any package renamed, any URL changed, any flag removed or added, any new prerequisite. If a change is needed, propose it for **both** scripts in the same commit.
 
