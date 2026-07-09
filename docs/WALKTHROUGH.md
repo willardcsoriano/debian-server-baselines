@@ -375,13 +375,15 @@ Three different tools, three different jobs:
 **What it does:** Builds a cryptographic-hash database of every important file on the system. Later, you run `aide --check` and it tells you exactly what changed since the baseline.
 
 **Files/state changed:**
-- Package: `aide`
+- Packages: `aide` (binary) and `aide-common` (default config + the `aideinit` init script — without it, initialization silently produces no database at all)
 - Database: `/var/lib/aide/aide.db` (or `aide.db.gz`)
 - Config: `/etc/aide/aide.conf` and `/etc/aide/aide.conf.d/`
 
 **Why both AIDE and rkhunter:** rkhunter is signature-based (looks for *known* bad things). AIDE is generic — it catches *any* unexpected change, even from rootkits rkhunter has never heard of.
 
 **Run manually:** `sudo aide --check` (warning: large output the first time after Debian package updates)
+
+**Verify after:** `ls -la /var/lib/aide/` should show `aide.db` or `aide.db.gz`. If `/var/lib/aide/` doesn't exist at all, initialization failed — check the section's `warn` output and try `sudo aideinit` manually.
 
 ### auditd
 
