@@ -2,7 +2,7 @@
 
 ## Overview
 
-A hardened host running `base.sh` exposes a latent permission bug in any Docker workflow that bind-mounts host source into a container and runs the container process as a non-root user with a UID different from the host owner. The hardening step at `base.sh` line 529 sets `UMASK 027` in `/etc/login.defs`; Debian's default `USERGROUPS_ENAB yes` collapses that to an effective umask of `0007` for normal users. New files in the developer's home tree are created mode `660`, directories mode `770`, with no permissions for "other". Containers whose service user does not have a UID matching the host owner are "other" to the bind-mounted tree and receive `EACCES` on every read. The behavior is correct given the policy; it is the silent surprise that warrants documentation. This report describes the failure mode observed on `acme`, the workaround applied downstream, and what `base.sh` could add to flag the interaction for future users.
+A hardened host running `base.sh` exposes a latent permission bug in any Docker workflow that bind-mounts host source into a container and runs the container process as a non-root user with a UID different from the host owner. The hardening step at `base.sh` line 529 sets `UMASK 027` in `/etc/login.defs`; Debian's default `USERGROUPS_ENAB yes` collapses that to an effective umask of `0007` for normal users. New files in the developer's home tree are created mode `660`, directories mode `770`, with no permissions for "other". Containers whose service user does not have a UID matching the host owner are "other" to the bind-mounted tree and receive `EACCES` on every read. The behavior is correct given the policy; it is the silent surprise that warrants documentation. This report describes the failure mode observed on a downstream Laravel project, the workaround applied there, and what `base.sh` could add to flag the interaction for future users.
 
 ## Table of Contents
 
@@ -61,7 +61,7 @@ will hit the same failure on a `base.sh` host. Common candidates include `node`,
 
 ## Workaround applied downstream
 
-The `acme` project resolved this by mirroring the UID-remap pattern its `app` Dockerfile already used for `www-data`. A small `docker/nginx/Dockerfile` was added:
+The downstream project resolved this by mirroring the UID-remap pattern its `app` Dockerfile already used for `www-data`. A small `docker/nginx/Dockerfile` was added:
 
 ```dockerfile
 FROM nginx:1.27-alpine
@@ -117,5 +117,5 @@ stat -c '%a %U:%G %n' /tmp/repro /tmp/repro/file   # 770 / 660
 - `base.sh:529` — `set_login_def UMASK 027`
 - `/etc/login.defs` — `USERGROUPS_ENAB yes` (Debian default, unchanged by `base.sh`)
 - `login.defs(5)` — documents the `USERGROUPS_ENAB` collapse behavior
-- Downstream project Dockerfile (`acme/Dockerfile`) — pre-existing `www-data` remap that demonstrates the correct pattern
-- Downstream nginx Dockerfile (`acme/docker/nginx/Dockerfile`) — the new remap that closes the gap
+- Downstream project's application Dockerfile — pre-existing `www-data` remap that demonstrates the correct pattern
+- Downstream project's nginx Dockerfile (`docker/nginx/Dockerfile`) — the new remap that closes the gap
