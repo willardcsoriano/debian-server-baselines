@@ -66,6 +66,8 @@ sudo bash scripts/base.sh   # or, as your sudo user:  bash scripts/dev.sh
 Most hardening scripts lock your server and disappear. This one installs the tools to keep it hardened — so you have ongoing visibility, not just a one-time configuration.
 
 > Want a section-by-section walkthrough with verification commands and threat-model notes? See [walkthrough.md](docs/walkthrough.md).
+>
+> UFW's 22/80/443-only policy is host-level only — it has no Hetzner Cloud counterpart by default. See [HETZNER-CLOUD.md](docs/HETZNER-CLOUD.md) for the matching Cloud Firewall (defense-in-depth above UFW) and the snapshot-based procedure for migrating a server to a larger type or different location.
 
 | Step | What |
 |---|---|
