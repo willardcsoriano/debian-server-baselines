@@ -7,6 +7,7 @@
 | Base | `sudo bash scripts/base.sh` | SSH, UFW, fail2ban, auditd, AIDE, AppArmor, Lynis — every server first |
 | Prod | `bash scripts/prod.sh` | Rootless Docker + Compose, Bitwarden secrets CLI — container-only prod hosts |
 | Dev | `bash scripts/dev.sh` | Node, Claude Code CLI, `gh`, `make`, Bitwarden — developer workstation |
+| GUI test | `bash scripts/gui-test.sh` | XFCE + Firefox/Chromium over VNC, Go, Ollama — disposable destructive-testing box |
 | Syslog | `sudo bash scripts/syslog.sh` | rsyslog TCP 514 receiver, per-sender log buckets — central log host |
 | WireGuard | `sudo bash scripts/wireguard.sh` | WireGuard keypair + peer management — server-to-server tunnel |
 
@@ -24,6 +25,7 @@ Idempotent hardening and role-specific tooling for Debian 13 servers. Every serv
 - [Role scripts](#role-scripts)
   - [prod.sh — container-only prod hosts](#prodsh-container-only-prod-hosts)
   - [dev.sh — developer workstation](#devsh-developer-workstation)
+  - [gui-test.sh — disposable destructive-testing box](#gui-testsh-disposable-destructive-testing-box)
   - [syslog.sh — central log receiver](#syslogsh-central-log-receiver)
   - [wireguard.sh — server-to-server tunnel](#wireguardsh-server-to-server-tunnel)
 - [What happens](#what-happens)
@@ -45,6 +47,9 @@ curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-basel
 
 # dev — run as your sudo user (no sudo):
 curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baselines/main/scripts/dev.sh | bash
+
+# gui-test — run as your sudo user (no sudo):
+curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baselines/main/scripts/gui-test.sh | bash
 
 # syslog — run as root:
 curl -fsSL https://raw.githubusercontent.com/willardcsoriano/debian-server-baselines/main/scripts/syslog.sh | sudo bash
@@ -137,6 +142,14 @@ Same Docker setup as `prod.sh`, plus:
 - Bitwarden Secrets Manager CLI (`bws`) — standalone binary from `bitwarden/sdk-sm` GitHub releases, sha256-verified, installed to `~/.local/bin`
 - Antigravity CLI (`agy`) — Google's native installer (`antigravity.google/cli/install.sh`) drops a SHA512-verified, Node-independent binary in `~/.local/bin/agy`. Replaces the Gemini CLI, which Google retired on 2026-06-18 (now paid-Enterprise-API-key only). Import old config with `agy plugin import gemini`
 
+### gui-test.sh — disposable destructive-testing box
+
+```bash
+bash scripts/gui-test.sh
+```
+
+Not a daily-driver role — for a throwaway VM you deliberately break things on (e.g. testing a tool that runs generated shell commands against a real filesystem) and reset between rounds rather than trust to keep working. Installs an XFCE desktop with Firefox ESR and Chromium, reachable over VNC on `127.0.0.1:5901` only — never opened in UFW, reached exclusively through an SSH tunnel, same pattern as Cockpit/Netdata below. Also installs the Go toolchain (resolved against `go.dev`'s release JSON at run time, not a version pinned in the script) and Ollama with `qwen2.5-coder:3b` pulled, plus `bubblewrap` and `build-essential` for anything the workload being tested needs to sandbox or compile. Does not clone any repository or handle any credential — that's a manual step with your own keys, by design. See [HETZNER-CLOUD.md](docs/HETZNER-CLOUD.md) for snapshotting before a destructive round and rebuilding back to it after (`hcloud server create-image` / `hcloud server rebuild --image`).
+
 ### syslog.sh — central log receiver
 
 ```bash
@@ -208,6 +221,13 @@ ssh -N -L 9090:localhost:9090 youruser@your-server-ip
 
 ssh -N -L 19999:localhost:19999 youruser@your-server-ip
 # open http://localhost:19999
+```
+
+If `gui-test.sh` has run, same pattern for the VNC desktop:
+
+```bash
+ssh -N -L 5901:localhost:5901 youruser@your-server-ip
+# point a VNC client at localhost:5901
 ```
 
 Lynis report: `/var/log/lynis.log`
