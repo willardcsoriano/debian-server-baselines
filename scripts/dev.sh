@@ -816,7 +816,10 @@ pass "agent-sessions: snapshot every 5 min (user timer, survives logout via ling
 # symlink into a personal config repo) untouched.  Managed values outrank user
 # settings, so this is the floor for every user on this host.
 # Last verified: 2026-10-12
-sudo mkdir -p /etc/claude-code/managed-settings.d
+# Explicit modes: base.sh sets root's umask to 027, so a plain mkdir leaves
+# these root-only and Claude Code -- running as the user -- can't read them.
+sudo install -d -m 0755 /etc/claude-code /etc/claude-code/managed-settings.d
+sudo chmod 0755 /etc/claude-code /etc/claude-code/managed-settings.d   # fix dirs from earlier runs
 echo "{ \"cleanupPeriodDays\": $CLAUDE_RETENTION_DAYS }" \
   | sudo tee /etc/claude-code/managed-settings.d/50-agent-host-retention.json > /dev/null
 sudo chmod 0644 /etc/claude-code/managed-settings.d/50-agent-host-retention.json
@@ -869,7 +872,7 @@ fi
 if [[ "$(jq -r '.cleanupPeriodDays' /etc/claude-code/managed-settings.d/50-agent-host-retention.json 2>/dev/null)" == "$CLAUDE_RETENTION_DAYS" ]]; then
   pass "Managed retention file valid (${CLAUDE_RETENTION_DAYS} days)"
 else
-  warn "Managed retention file missing or not valid JSON"
+  warn "Managed retention file not readable as $USER, or not valid JSON -- Claude Code can't apply it (ls -ld /etc/claude-code)"
 fi
 
 # ─── Summary ─────────────────────────────────────────────────────────────────
