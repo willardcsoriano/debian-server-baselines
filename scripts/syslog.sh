@@ -40,9 +40,7 @@ systemctl is-active --quiet ufw \
 command -v rsyslogd &>/dev/null \
   || fail "rsyslogd not found — install rsyslog and re-run."
 
-RERUN=0
 if [[ -f /etc/rsyslog.d/50-receiver.conf ]]; then
-  RERUN=1
   note "Re-run detected — config will be refreshed"
 fi
 
