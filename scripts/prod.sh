@@ -84,7 +84,10 @@ Signed-By: /etc/apt/keyrings/docker.asc
 EOF
   sudo apt-get update -qq
 fi
-sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq \
+# --no-upgrade: a re-run installs what's missing but never upgrades the
+# engine under running containers.  Upgrading Docker is a deliberate act
+# (apt-get install --only-upgrade docker-ce ...), not a side effect of refresh.
+sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-upgrade \
   docker-ce docker-ce-cli containerd.io \
   docker-buildx-plugin docker-compose-plugin \
   docker-ce-rootless-extras uidmap
