@@ -106,11 +106,14 @@ apt list --upgradable 2>/dev/null | grep -F -f <(printf '%s/\n' "${upgradable[@]
 
 mapfile -t running < <(docker ps --format '{{.Names}}')
 no_restart=()
+auto_remove=()   # started with --rm: a daemon restart deletes them, by design
 for c in "${running[@]}"; do
   policy=$(docker inspect -f '{{.HostConfig.RestartPolicy.Name}}' "$c")
   [[ "$policy" == "no" || -z "$policy" ]] && no_restart+=("$c")
+  [[ "$(docker inspect -f '{{.HostConfig.AutoRemove}}' "$c")" == "true" ]] && auto_remove+=("$c")
 done
 echo "  Running containers: ${#running[@]}"
+(( ${#auto_remove[@]} )) && note "Started with --rm (will be deleted by the restart, not restored): ${auto_remove[*]}"
 (( ${#no_restart[@]} )) && note "Without a restart policy (this script restarts them; a reboot won't): ${no_restart[*]}"
 
 (( CHECK )) && { note "--check: nothing changed."; exit 0; }
@@ -132,32 +135,73 @@ docker info >/dev/null 2>&1 || fail "Docker didn't come back within 30s after th
 pass "Daemon running: $(docker version --format '{{.Server.Version}}')"
 
 step "Restore containers"
-for c in "${running[@]}"; do
-  if [[ "$(docker inspect -f '{{.State.Running}}' "$c" 2>/dev/null)" != "true" ]]; then
-    if docker start "$c" >/dev/null 2>&1; then
-      note "Started $c (no restart policy)"
-    else
-      warn "docker start $c failed"
-    fi
+
+is_auto_remove() { [[ " ${auto_remove[*]} " == *" $1 "* ]]; }
+
+# Status, plus health when the container has a healthcheck; "gone" if it no
+# longer exists.  `if !` keeps a failed inspect's stray output out of $state.
+container_state() {
+  local st
+  if ! st=$(docker inspect -f '{{.State.Status}}{{if .State.Health}}/{{.State.Health.Status}}{{end}}' "$1" 2>/dev/null); then
+    st=gone
   fi
+  echo "$st"
+}
+
+# Start in passes: containers without compose dependencies first, then the
+# rest, then retry anything that exited -- e.g. an nginx that started before
+# the upstream it resolves and quit with "host not found in upstream".
+ordered=()
+for c in "${running[@]}"; do
+  is_auto_remove "$c" && continue
+  [[ -z "$(docker inspect -f '{{index .Config.Labels "com.docker.compose.depends_on"}}' "$c" 2>/dev/null)" ]] && ordered+=("$c")
+done
+for c in "${running[@]}"; do
+  is_auto_remove "$c" && continue
+  [[ " ${ordered[*]} " == *" $c "* ]] || ordered+=("$c")
+done
+
+for pass_no in 1 2 3; do
+  pending=0
+  for c in "${ordered[@]}"; do
+    st=$(container_state "$c")
+    [[ "$st" == running* ]] && continue
+    [[ "$st" == gone ]] && continue
+    pending=1
+    if docker start "$c" > /dev/null 2>&1; then
+      note "Pass $pass_no: started $c (was $st)"
+    else
+      note "Pass $pass_no: docker start $c failed (was $st)"
+    fi
+  done
+  (( pending )) || break
+  sleep 10
 done
 
 # Wait up to 60s for each container to be running and, if it has a
 # healthcheck, healthy -- a fixed sleep would report "fine" too early.
 failed=()
 for c in "${running[@]}"; do
-  state=""
+  if is_auto_remove "$c"; then
+    if [[ "$(container_state "$c")" == gone ]]; then
+      note "$c: deleted by the daemon restart (started with --rm) -- expected"
+    else
+      pass "$c: $(container_state "$c")"
+    fi
+    continue
+  fi
+  st=""
   for _ in $(seq 1 30); do
-    state=$(docker inspect -f '{{.State.Status}}{{if .State.Health}}/{{.State.Health.Status}}{{end}}' "$c" 2>/dev/null || echo missing)
-    [[ "$state" == "running" || "$state" == "running/healthy" ]] && break
+    st=$(container_state "$c")
+    [[ "$st" == "running" || "$st" == "running/healthy" ]] && break
     sleep 2
   done
-  if [[ "$state" == "running" || "$state" == "running/healthy" ]]; then
-    pass "$c: $state"
+  if [[ "$st" == "running" || "$st" == "running/healthy" ]]; then
+    pass "$c: $st"
   else
-    warn "$c: $state after 60s (docker logs $c)"
+    warn "$c: $st after 60s (docker logs $c)"
     failed+=("$c")
   fi
 done
 (( ${#failed[@]} == 0 )) || fail "${#failed[@]} container(s) not healthy after the upgrade: ${failed[*]}"
-pass "All ${#running[@]} previously running containers are running again"
+pass "All previously running containers are back (${#auto_remove[@]} --rm container(s) excluded)"
