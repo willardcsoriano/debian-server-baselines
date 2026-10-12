@@ -7,6 +7,7 @@
 | Base | `sudo bash scripts/base.sh` | SSH, UFW, fail2ban, auditd, AIDE, AppArmor, Lynis — every server first |
 | Prod | `bash scripts/prod.sh` | Rootless Docker + Compose, Bitwarden secrets CLI — container-only prod hosts |
 | Dev | `bash scripts/dev.sh` | Node, Claude Code CLI, `gh`, `make`, Bitwarden — developer workstation |
+| Docker upgrade | `bash scripts/docker-upgrade.sh` | Deliberate, verified Docker upgrade with container restore and rollback command — dev and prod |
 | Syslog | `sudo bash scripts/syslog.sh` | rsyslog TCP 514 receiver, per-sender log buckets — central log host |
 | WireGuard | `sudo bash scripts/wireguard.sh` | WireGuard keypair + peer management — server-to-server tunnel |
 
@@ -189,6 +190,7 @@ All scripts detect prior runs and adapt:
 - Adds new UFW rules instead of resetting; merges `sshd_config` keys in place
 - Re-runs Lynis to track hardening index improvement over time
 - Role scripts skip Docker / Node / etc. setup steps when their state checks pass
+- Role scripts never upgrade an installed Docker engine (`--no-upgrade`); upgrade deliberately with `scripts/docker-upgrade.sh` — see [agent-host.md](docs/agent-host.md#docker-upgrades)
 
 Re-run any time you update a script or want to refresh policy.
 
