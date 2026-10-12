@@ -6,7 +6,7 @@
 |---|---|---|
 | Base | `sudo bash scripts/base.sh` | SSH, UFW, fail2ban, auditd, AIDE, AppArmor, Lynis — every server first |
 | Prod | `bash scripts/prod.sh` | Rootless Docker + Compose, Bitwarden secrets CLI — container-only prod hosts |
-| Dev | `bash scripts/dev.sh` | Node, Claude Code CLI, `gh`, `make`, Bitwarden — developer workstation |
+| Dev | `bash scripts/dev.sh` | Node, Claude Code CLI, `gh`, `make`, Bitwarden, long-running agent host hardening — developer workstation |
 | Docker upgrade | `bash scripts/docker-upgrade.sh` | Deliberate, verified Docker upgrade with container restore and rollback command — dev and prod |
 | Syslog | `sudo bash scripts/syslog.sh` | rsyslog TCP 514 receiver, per-sender log buckets — central log host |
 | WireGuard | `sudo bash scripts/wireguard.sh` | WireGuard keypair + peer management — server-to-server tunnel |
@@ -136,6 +136,7 @@ Same Docker setup as `prod.sh`, plus:
 - GNU `make` for project-level orchestration
 - Bitwarden CLI (`bw`) — standalone binary from `bitwarden/clients` GitHub releases, installed to `~/.local/bin` (no `npm -g`)
 - Bitwarden Secrets Manager CLI (`bws`) — standalone binary from `bitwarden/sdk-sm` GitHub releases, sha256-verified, installed to `~/.local/bin`
+- Long-running agent host (section 9/9) — tops swap up to 16 GB, makes the OOM killer pick vscode-server before tmux agent sessions, records each tmux session's conversation ID so `agent-sessions restore` brings them all back after a reboot, and raises Claude Code transcript retention to 90 days. See [agent-host.md](docs/agent-host.md)
 - Antigravity CLI (`agy`) — Google's native installer (`antigravity.google/cli/install.sh`) drops a SHA512-verified, Node-independent binary in `~/.local/bin/agy`. Replaces the Gemini CLI, which Google retired on 2026-06-18 (now paid-Enterprise-API-key only). Import old config with `agy plugin import gemini`
 
 ### syslog.sh — central log receiver

@@ -53,9 +53,9 @@ _user_bus="/run/user/$_user_uid/bus"
 pass "Preflight OK — $USER, session confirmed"
 echo ""
 
-# ─── 1/8  Docker Engine (rootless) + Compose ─────────────────────────────────
+# ─── 1/9  Docker Engine (rootless) + Compose ─────────────────────────────────
 
-section "1/8  Docker Engine (rootless) + Compose"
+section "1/9  Docker Engine (rootless) + Compose"
 
 # DRIFT: apt repo format, package names, and rootless install procedure
 # change roughly annually.  Verify before editing:
@@ -146,9 +146,9 @@ fi
 
 pass "Docker (rootless) + Compose installed; user daemon enabled; linger on"
 
-# ─── 2/8  nvm + Node LTS ─────────────────────────────────────────────────────
+# ─── 2/9  nvm + Node LTS ─────────────────────────────────────────────────────
 
-section "2/8  nvm + Node LTS"
+section "2/9  nvm + Node LTS"
 
 # DRIFT: version string in the raw GitHub URL changes with every nvm release.
 # Check the latest tag before editing:
@@ -173,18 +173,18 @@ nvm alias default 'lts/*'
 NODE_VER=$(node --version)
 pass "nvm installed; Node $NODE_VER (LTS) active"
 
-# ─── 3/8  Corepack ───────────────────────────────────────────────────────────
+# ─── 3/9  Corepack ───────────────────────────────────────────────────────────
 
-section "3/8  Corepack"
+section "3/9  Corepack"
 
 # Enables pnpm and yarn on demand per project via package.json#packageManager.
 # No global install needed; corepack downloads the right version at first use.
 corepack enable
 pass "Corepack enabled"
 
-# ─── 4/8  Claude Code CLI ────────────────────────────────────────────────────
+# ─── 4/9  Claude Code CLI ────────────────────────────────────────────────────
 
-section "4/8  Claude Code CLI"
+section "4/9  Claude Code CLI"
 
 # DRIFT: Anthropic's native installer is the recommended path.  The npm
 # package @anthropic-ai/claude-code still ships but couples claude to a
@@ -195,7 +195,7 @@ section "4/8  Claude Code CLI"
 #   https://code.claude.com/docs/en/setup
 # Last verified: 2026-05-22
 
-# Per-user bin dir shared with bw (6/8) and bws (7/8); set up here so
+# Per-user bin dir shared with bw (6/9) and bws (7/9); set up here so
 # claude's install location is on PATH before its idempotency check runs.
 mkdir -p "$HOME/.local/bin"
 if ! grep -q 'HOME/.local/bin' "$HOME/.bashrc" 2>/dev/null; then
@@ -216,9 +216,9 @@ else
   pass "Claude Code CLI installed ($CLAUDE_VER)"
 fi
 
-# ─── 5/8  Operator extras: gh, make ──────────────────────────────────────────
+# ─── 5/9  Operator extras: gh, make ──────────────────────────────────────────
 
-section "5/8  Operator extras (gh, make)"
+section "5/9  Operator extras (gh, make)"
 
 # ── gh ────────────────────────────────────────────────────────────────────────
 
@@ -256,9 +256,9 @@ else
   pass "make installed"
 fi
 
-# ─── 6/8  Bitwarden CLI (bw) ─────────────────────────────────────────────────
+# ─── 6/9  Bitwarden CLI (bw) ─────────────────────────────────────────────────
 
-section "6/8  Bitwarden CLI (bw)"
+section "6/9  Bitwarden CLI (bw)"
 
 # DRIFT: bw is published as prebuilt zips on GitHub releases under
 # bitwarden/clients with tag format cli-vYYYY.M.P.  Asset names follow
@@ -272,7 +272,7 @@ section "6/8  Bitwarden CLI (bw)"
 # only path that fits.
 # Last verified: 2026-05-22
 
-# Per-user bin dir and PATH are set up in section 4/8 (shared with claude).
+# Per-user bin dir and PATH are set up in section 4/9 (shared with claude).
 
 # unzip is required by both bw and bws install steps; apt-get is idempotent.
 sudo env DEBIAN_FRONTEND=noninteractive apt-get install -y -qq unzip
@@ -302,9 +302,9 @@ else
   pass "Bitwarden CLI installed ($BW_VER)"
 fi
 
-# ─── 7/8  Bitwarden Secrets Manager CLI (bws) ────────────────────────────────
+# ─── 7/9  Bitwarden Secrets Manager CLI (bws) ────────────────────────────────
 
-section "7/8  Bitwarden Secrets Manager CLI (bws)"
+section "7/9  Bitwarden Secrets Manager CLI (bws)"
 
 # DRIFT: bws is published as prebuilt zips on GitHub releases under
 # bitwarden/sdk-sm with tag format bws-vX.Y.Z.  Asset names follow
@@ -350,9 +350,9 @@ else
   pass "bws installed ($BWS_VER)"
 fi
 
-# ─── 8/8  Antigravity CLI ────────────────────────────────────────────────────
+# ─── 8/9  Antigravity CLI ────────────────────────────────────────────────────
 
-section "8/8  Antigravity CLI"
+section "8/9  Antigravity CLI"
 
 # DRIFT: Google deprecated Gemini CLI on 2026-06-18 — for AI Pro/Ultra and
 # free-tier accounts it stopped serving requests and is superseded by
@@ -371,7 +371,7 @@ section "8/8  Antigravity CLI"
 # Import an existing Gemini CLI config with:  agy plugin import gemini
 # Last verified: 2026-07-06
 
-# Per-user bin dir and PATH are set up in section 4/8 (shared with claude).
+# Per-user bin dir and PATH are set up in section 4/9 (shared with claude).
 
 if command -v agy &>/dev/null; then
   AGY_VER=$(agy --version 2>/dev/null | head -1 || echo "installed")
@@ -381,6 +381,398 @@ else
   AGY_VER=$(agy --version 2>/dev/null | head -1 || echo "installed")
   pass "Antigravity CLI installed ($AGY_VER)"
 fi
+
+# ─── 9/9  Long-running agent host ────────────────────────────────────────────
+
+section "9/9  Long-running agent host"
+
+# For hosts that keep many long-lived AI agent sessions (claude, agy) in tmux.
+# Four failure modes, four fixes -- full rationale and operations in
+# docs/agent-host.md:
+#   a. Swap headroom: idle sessions page out and fill a small swap file,
+#      leaving no buffer for a burst (several VS Code windows).
+#   b. OOM victim choice: at the default oom_score_adj an agent scores the
+#      same as vscode-server, so the kernel may kill an irreplaceable agent
+#      before the reconnectable editor server.
+#   c. Reboots: a reboot kills every session.  agent-sessions records each
+#      tmux session's conversation ID so one command brings them all back.
+#   d. Transcript retention: Claude Code deletes transcripts after
+#      cleanupPeriodDays (default 30), after which an idle session can't be
+#      resumed.  Raised machine-wide via managed settings.  PRIVACY: longer
+#      retention keeps more conversation data -- possibly client records --
+#      on disk; this host's disk is the boundary that has to protect it.
+# Tunables (env): SWAP_TARGET_GB (default 16), CLAUDE_RETENTION_DAYS (default 90)
+
+SWAP_TARGET_GB="${SWAP_TARGET_GB:-16}"
+CLAUDE_RETENTION_DAYS="${CLAUDE_RETENTION_DAYS:-90}"
+
+# ── a. Swap ───────────────────────────────────────────────────────────────────
+
+# Adds a second swap file for the shortfall instead of resizing the existing
+# one: resizing means swapoff, which forces every paged-out idle session back
+# into RAM at once.  Swap lives on the server's local disk -- no extra cost.
+_extra_swap=/swapfile.agents
+_gib=$((1024 * 1024))   # KiB per GiB
+_swap_kb=$(awk '/^SwapTotal:/ { print $2 }' /proc/meminfo)
+if [[ -e "$_extra_swap" ]] && ! grep -q "^$_extra_swap " /proc/swaps; then
+  sudo swapon "$_extra_swap" && note "Re-activated existing $_extra_swap"
+  _swap_kb=$(awk '/^SwapTotal:/ { print $2 }' /proc/meminfo)
+fi
+if (( _swap_kb + _gib >= SWAP_TARGET_GB * _gib )); then
+  pass "Swap: $(( (_swap_kb + _gib / 2) / _gib )) GiB (target ${SWAP_TARGET_GB} GiB)"
+elif [[ -e "$_extra_swap" ]]; then
+  warn "Swap below target but $_extra_swap already exists -- inspect with: swapon --show"
+else
+  _need_gb=$(( (SWAP_TARGET_GB * _gib - _swap_kb + _gib - 1) / _gib ))
+  _fs=$(findmnt -no FSTYPE /)
+  _free_gb=$(df --output=avail -BG / | tail -1 | tr -dc '0-9')
+  if [[ "$_fs" != ext4 && "$_fs" != xfs ]]; then
+    warn "Root filesystem is $_fs -- swap file not created (needs ext4 or xfs)"
+  elif (( _free_gb < _need_gb + 20 )); then
+    warn "Only ${_free_gb} GiB free -- need ${_need_gb} GiB plus 20 GiB headroom; swap not extended"
+  else
+    sudo fallocate -l "${_need_gb}G" "$_extra_swap"
+    sudo chmod 600 "$_extra_swap"
+    sudo mkswap -q "$_extra_swap"
+    sudo swapon "$_extra_swap"
+    grep -q "^$_extra_swap " /etc/fstab \
+      || echo "$_extra_swap none swap sw 0 0" | sudo tee -a /etc/fstab > /dev/null
+    _swap_kb=$(awk '/^SwapTotal:/ { print $2 }' /proc/meminfo)
+    pass "Swap: added ${_need_gb} GiB at $_extra_swap -- now $(( (_swap_kb + _gib / 2) / _gib )) GiB"
+  fi
+fi
+
+# ── b. OOM priority ───────────────────────────────────────────────────────────
+
+# A root timer rather than a one-shot: processes started before the first run
+# need it, and lowering oom_score_adj requires root.  systemd-oomd was
+# considered and rejected -- it kills whole cgroups, i.e. several agents at once.
+sudo tee /usr/local/sbin/agent-oom-priority > /dev/null <<'AGENT_OOM_EOF'
+#!/usr/bin/env bash
+# agent-oom-priority — when memory runs out, make the kernel kill VS Code's
+# server (it reconnects) before long-lived tmux agent sessions (they don't).
+#
+# Sets oom_score_adj on every tmux server and everything under it (agent
+# sessions, their MCP servers) to AGENT_ADJ, and on every ~/.vscode-server
+# process tree to EDITOR_ADJ.  Children inherit oom_score_adj at fork, so new
+# panes start protected; this pass covers processes that existed before it.
+# Runs as root from agent-oom-priority.timer (lowering a score needs
+# CAP_SYS_RESOURCE).  -n prints the changes instead of making them.
+#
+# Installed by debian-server-baselines scripts/dev.sh (section 9/9); see
+# docs/agent-host.md.  Re-running dev.sh overwrites this file.
+set -uo pipefail
+
+AGENT_ADJ=-500   # not -1000: a genuinely runaway agent must stay killable
+EDITOR_ADJ=500
+
+dry=0
+[[ "${1:-}" == "-n" ]] && dry=1
+
+servers=" $(pgrep -x 'tmux: server' | tr '\n' ' ') "
+
+ps -eo pid=,ppid=,args= | awk -v servers="$servers" -v a="$AGENT_ADJ" -v e="$EDITOR_ADJ" '
+  { pid = $1; pp[pid] = $2; $1 = $2 = ""; args[pid] = $0; order[n++] = pid }
+  END {
+    for (i = 0; i < n; i++) {
+      p = order[i]; q = p; adj = ""
+      # The nearest matching ancestor decides; tmux servers are daemonized,
+      # so a pane is never classified as vscode even if tmux was first
+      # started from a VS Code terminal.
+      while (q > 1 && (q in pp)) {
+        if (index(servers, " " q " ")) { adj = a; break }
+        if (args[q] ~ /\/\.vscode-server\//) { adj = e; break }
+        q = pp[q]
+      }
+      if (adj != "") print p, adj
+    }
+  }' | while read -r pid want; do
+    cur=$(cat "/proc/$pid/oom_score_adj" 2>/dev/null) || continue   # exited meanwhile
+    [[ "$cur" == "$want" ]] && continue
+    if (( dry )); then
+      echo "$pid $(cat "/proc/$pid/comm" 2>/dev/null): $cur -> $want"
+    else
+      echo "$want" > "/proc/$pid/oom_score_adj" 2>/dev/null || true
+    fi
+  done
+exit 0
+AGENT_OOM_EOF
+sudo chmod 0755 /usr/local/sbin/agent-oom-priority
+
+sudo tee /etc/systemd/system/agent-oom-priority.service > /dev/null <<'EOF'
+[Unit]
+Description=Prefer vscode-server over tmux agent sessions as OOM victims
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/agent-oom-priority
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateNetwork=yes
+EOF
+sudo tee /etc/systemd/system/agent-oom-priority.timer > /dev/null <<'EOF'
+[Unit]
+Description=Re-apply agent OOM priorities every minute
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=1min
+AccuracySec=10s
+
+[Install]
+WantedBy=timers.target
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable --now agent-oom-priority.timer > /dev/null
+sudo systemctl start agent-oom-priority.service
+pass "OOM priority: tmux agents -500, vscode-server +500 (agent-oom-priority.timer, every 1 min)"
+
+# ── c. Session snapshot / restore ─────────────────────────────────────────────
+
+tee "$HOME/.local/bin/agent-sessions" > /dev/null <<'AGENT_SESSIONS_EOF'
+#!/usr/bin/env bash
+# agent-sessions — remember which AI agent conversation runs in which tmux
+# session, so a reboot doesn't cost you the sessions.
+#
+#   agent-sessions snapshot          record live tmux sessions (a user timer runs this every 5 min)
+#   agent-sessions list              show what's recorded and whether each session is live
+#   agent-sessions restore [-n]      recreate missing tmux sessions and resume each conversation
+#                                    (-n: dry run, print what would happen)
+#   agent-sessions forget NAME       drop a session from the record
+#   agent-sessions hint              one-line notice if sessions are waiting to be restored
+#
+# Installed by debian-server-baselines scripts/dev.sh (section 9/9); see
+# docs/agent-host.md.  Re-running dev.sh overwrites this file.
+#
+# DRIFT: reads ~/.claude/sessions/<pid>.json, an internal Claude Code file
+# (fields used: pid, sessionId, cwd, tmux = "<session>:@<window>.%<pane>").
+# It is not a documented interface.  If its shape changes, claude panes are
+# recorded without a sessionId and `list`/`restore` say so -- nothing is
+# guessed.  Last verified: 2026-10-12 against Claude Code 2.1.296.
+set -euo pipefail
+
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/agent-sessions"
+MANIFEST="$STATE_DIR/manifest.json"
+CLAUDE_SESSIONS_DIR="$HOME/.claude/sessions"
+BOOT_ID=$(cat /proc/sys/kernel/random/boot_id)
+
+# Test seams: run against a private tmux server / a stand-in claude command.
+TMUX_CMD=(tmux)
+[[ -n "${AGENT_SESSIONS_TMUX_SOCKET:-}" ]] && TMUX_CMD=(tmux -L "$AGENT_SESSIONS_TMUX_SOCKET")
+CLAUDE_RESUME_CMD="${AGENT_SESSIONS_CLAUDE_CMD:-claude}"
+
+die() { echo "agent-sessions: $*" >&2; exit 1; }
+command -v jq >/dev/null || die "jq is required"
+
+load_manifest() {
+  if [[ -s "$MANIFEST" ]] && jq -e '.sessions | type == "array"' "$MANIFEST" >/dev/null 2>&1; then
+    cat "$MANIFEST"
+  else
+    echo '{"sessions":[]}'
+  fi
+}
+
+# Live tmux sessions as JSON: [{tmux, cwd, command}] -- first pane of each session.
+live_tmux_json() {
+  "${TMUX_CMD[@]}" list-panes -a \
+    -F '#{session_name}	#{window_index}	#{pane_index}	#{pane_current_path}	#{pane_current_command}' 2>/dev/null \
+    | sort -t$'\t' -k1,1 -k2,2n -k3,3n \
+    | awk -F'\t' '!seen[$1]++ { print $1 "\t" $4 "\t" $5 }' \
+    | jq -R -s -c 'split("\n") | map(select(length > 0) | split("\t") | {tmux: .[0], cwd: .[1], command: .[2]})'
+}
+
+# Live claude processes that report a tmux pane: [{tmux, sessionId, cwd}].
+live_claude_json() {
+  local f pid out='[]'
+  shopt -s nullglob
+  for f in "$CLAUDE_SESSIONS_DIR"/*.json; do
+    pid=$(basename "$f" .json)
+    [[ "$pid" =~ ^[0-9]+$ ]] || continue
+    # Skip stale files and recycled PIDs.
+    [[ "$(cat "/proc/$pid/comm" 2>/dev/null)" == "claude" ]] || continue
+    out=$(jq -c --argjson acc "$out" '
+      if (.tmux | type) == "string" and (.sessionId | type) == "string"
+      then $acc + [{tmux: (.tmux | split(":")[0]), sessionId, cwd}]
+      else $acc end' "$f" 2>/dev/null || echo "$out")
+  done
+  echo "$out"
+}
+
+cmd_snapshot() {
+  mkdir -p "$STATE_DIR"
+  chmod 700 "$STATE_DIR"
+  local live claude old new
+  live=$(live_tmux_json)
+  claude=$(live_claude_json)
+  old=$(load_manifest)
+  new=$(jq -n -c --argjson live "$live" --argjson claude "$claude" --argjson old "$old" \
+      --arg boot "$BOOT_ID" --arg now "$(date -Is)" '
+    ($live | map(.tmux)) as $names
+    | [ $live[] as $t
+        | ([ $claude[] | select(.tmux == $t.tmux) ] | first) as $c
+        | if $c then {tmux: $t.tmux, kind: "claude", cwd: ($c.cwd // $t.cwd), sessionId: $c.sessionId}
+          else {tmux: $t.tmux, kind: "other", cwd: $t.cwd, command: $t.command} end
+        | . + {boot: $boot, seen: $now} ]
+    # Keep sessions last seen in an earlier boot (lost to a reboot, not yet
+    # restored).  A session that disappeared during this boot was closed on
+    # purpose, so it is dropped.
+    + [ $old.sessions[] | select((.tmux | IN($names[])) | not) | select(.boot != $boot) ]
+    | {version: 1, sessions: .}')
+  printf '%s\n' "$new" > "$MANIFEST.tmp"
+  mv "$MANIFEST.tmp" "$MANIFEST"
+}
+
+live_names() { "${TMUX_CMD[@]}" list-sessions -F '#{session_name}' 2>/dev/null || true; }
+
+cmd_list() {
+  local live
+  live=$(live_names | jq -R -s -c 'split("\n") | map(select(length > 0))')
+  load_manifest | jq -r --argjson live "$live" '
+    .sessions[]
+    | [ .tmux,
+        (if (.tmux | IN($live[])) then "live" else "MISSING" end),
+        .kind,
+        (if .kind == "claude" then .sessionId else (.command // "-") end),
+        .cwd,
+        .seen ]
+    | @tsv' | column -t -s $'\t' -N SESSION,STATE,KIND,CONVERSATION/CMD,CWD,LAST_SEEN
+}
+
+cmd_restore() {
+  local dry=0
+  [[ "${1:-}" == "-n" ]] && dry=1
+  local live entries restored=0 skipped=0 seen_ids=" "
+  live=" $(live_names | tr '\n' ' ') "
+  entries=$(load_manifest | jq -c '.sessions[]')
+  [[ -n "$entries" ]] || { echo "Nothing recorded yet."; return 0; }
+
+  while IFS= read -r e; do
+    local name kind cwd sid cmd
+    name=$(jq -r '.tmux' <<<"$e"); kind=$(jq -r '.kind' <<<"$e")
+    cwd=$(jq -r '.cwd' <<<"$e");   sid=$(jq -r '.sessionId // empty' <<<"$e")
+    cmd=$(jq -r '.command // empty' <<<"$e")
+    [[ "$live" == *" $name "* ]] && continue
+
+    if [[ "$kind" == "claude" && -n "$sid" && "$seen_ids" == *" $sid "* ]]; then
+      echo "  ! $name: conversation $sid is already being restored in another session -- skipped"
+      echo "    (two live processes on one transcript corrupt it; resume it by hand if you really mean to)"
+      skipped=$((skipped + 1)); continue
+    fi
+    [[ -d "$cwd" ]] || { echo "  ! $name: $cwd no longer exists, using \$HOME"; cwd=$HOME; }
+
+    if (( dry )); then
+      local what=${cmd:-shell}
+      [[ -n "$sid" ]] && what="$CLAUDE_RESUME_CMD --resume $sid"
+      echo "  would restore $name in $cwd: $what"
+      [[ -n "$sid" ]] && seen_ids+="$sid "
+      continue
+    fi
+
+    "${TMUX_CMD[@]}" new-session -d -s "$name" -c "$cwd"
+    if [[ "$kind" == "claude" && -n "$sid" ]]; then
+      # Typed into the pane's login shell so PATH and .bashrc apply, and
+      # quitting claude leaves a shell behind, same as a hand-started session.
+      "${TMUX_CMD[@]}" send-keys -t "$name" "$CLAUDE_RESUME_CMD --resume $sid" Enter
+      seen_ids+="$sid "
+      echo "  ✓ $name: resumed conversation $sid"
+    elif [[ "$kind" == "claude" ]]; then
+      echo "  ! $name: no conversation ID was recorded -- opened a shell; run 'claude --resume' to pick one"
+    elif [[ -n "$cmd" && ! "$cmd" =~ ^(bash|sh|zsh|fish)$ ]]; then
+      echo "  ! $name: was running '$cmd' -- opened a shell in $cwd; start it yourself"
+    else
+      echo "  ✓ $name: shell in $cwd"
+    fi
+    restored=$((restored + 1))
+  done <<<"$entries"
+
+  (( dry )) && return 0
+  echo "Restored $restored session(s), skipped $skipped."
+  # Record the restored sessions as seen in this boot right away, so closing
+  # one before the next timer run counts as closing it on purpose.
+  cmd_snapshot
+}
+
+cmd_forget() {
+  [[ -n "${1:-}" ]] || die "usage: agent-sessions forget NAME"
+  local new
+  new=$(load_manifest | jq -c --arg n "$1" '.sessions |= map(select(.tmux != $n))')
+  printf '%s\n' "$new" > "$MANIFEST.tmp" && mv "$MANIFEST.tmp" "$MANIFEST"
+}
+
+cmd_hint() {
+  [[ -s "$MANIFEST" ]] || return 0
+  local live n
+  live=$(live_names | jq -R -s -c 'split("\n") | map(select(length > 0))')
+  n=$(load_manifest | jq --argjson live "$live" --arg boot "$BOOT_ID"       '[.sessions[] | select(.boot != $boot) | select((.tmux | IN($live[])) | not)] | length' 2>/dev/null || echo 0)
+  (( n > 0 )) && echo "agent-sessions: $n session(s) from before the last reboot are not running -- 'agent-sessions list' / 'agent-sessions restore'"
+  return 0
+}
+
+case "${1:-}" in
+  snapshot) cmd_snapshot ;;
+  list)     cmd_list ;;
+  restore)  shift; cmd_restore "$@" ;;
+  forget)   shift; cmd_forget "$@" ;;
+  hint)     cmd_hint ;;
+  *) sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit 2 ;;
+esac
+AGENT_SESSIONS_EOF
+chmod 0755 "$HOME/.local/bin/agent-sessions"
+
+mkdir -p "$HOME/.config/systemd/user"
+cat > "$HOME/.config/systemd/user/agent-sessions-snapshot.service" <<'EOF'
+[Unit]
+Description=Record which agent conversation runs in which tmux session
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/agent-sessions snapshot
+EOF
+cat > "$HOME/.config/systemd/user/agent-sessions-snapshot.timer" <<'EOF'
+[Unit]
+Description=Snapshot tmux agent sessions every 5 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target
+EOF
+XDG_RUNTIME_DIR="/run/user/$_user_uid" \
+DBUS_SESSION_BUS_ADDRESS="unix:path=$_user_bus" \
+  systemctl --user daemon-reload
+XDG_RUNTIME_DIR="/run/user/$_user_uid" \
+DBUS_SESSION_BUS_ADDRESS="unix:path=$_user_bus" \
+  systemctl --user enable --now agent-sessions-snapshot.timer > /dev/null
+"$HOME/.local/bin/agent-sessions" snapshot \
+  || warn "First agent-sessions snapshot failed -- run 'agent-sessions snapshot' to see why"
+
+if ! grep -q 'agent-sessions hint' "$HOME/.bashrc" 2>/dev/null; then
+  cat >> "$HOME/.bashrc" <<'EOF'
+
+# After a reboot, say which tmux agent sessions are waiting to be restored
+command -v agent-sessions > /dev/null && agent-sessions hint
+EOF
+fi
+pass "agent-sessions: snapshot every 5 min (user timer, survives logout via linger)"
+
+# ── d. Transcript retention ───────────────────────────────────────────────────
+
+# DRIFT: managed settings file location and merge rules.  Verify before editing:
+#   https://code.claude.com/docs/en/managed-settings
+#   https://code.claude.com/docs/en/settings-reference#cleanupperioddays
+# A drop-in under managed-settings.d/ leaves ~/.claude/settings.json (often a
+# symlink into a personal config repo) untouched.  Managed values outrank user
+# settings, so this is the floor for every user on this host.
+# Last verified: 2026-10-12
+sudo mkdir -p /etc/claude-code/managed-settings.d
+echo "{ \"cleanupPeriodDays\": $CLAUDE_RETENTION_DAYS }" \
+  | sudo tee /etc/claude-code/managed-settings.d/50-agent-host-retention.json > /dev/null
+sudo chmod 0644 /etc/claude-code/managed-settings.d/50-agent-host-retention.json
+pass "Claude Code transcript retention: ${CLAUDE_RETENTION_DAYS} days (managed setting)"
 
 # ─── Summary ─────────────────────────────────────────────────────────────────
 
@@ -399,6 +791,7 @@ echo -e "  ${GREEN}✓${NC} make: $(make --version | head -1)"
 echo -e "  ${GREEN}✓${NC} Bitwarden CLI: $BW_VER"
 echo -e "  ${GREEN}✓${NC} Bitwarden Secrets Manager CLI: $BWS_VER"
 echo -e "  ${GREEN}✓${NC} Antigravity CLI: $AGY_VER ${DIM}(native binary, no Node)${NC}"
+echo -e "  ${GREEN}✓${NC} Agent host: swap target ${SWAP_TARGET_GB} GiB, OOM priority timer, agent-sessions, ${CLAUDE_RETENTION_DAYS}-day transcript retention"
 echo ""
 echo -e "  Log in as: ${BOLD}ssh $USER@$SERVER_IP${NC}"
 echo -e "  ${YELLOW}Reload your shell${NC} (${DIM}exec \$SHELL -l${NC}) to activate nvm, DOCKER_HOST, and ~/.local/bin."
