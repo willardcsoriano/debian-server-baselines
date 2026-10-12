@@ -10,31 +10,31 @@ This is the section-by-section explainer for `base.sh` — what each of the 20 n
 - [At a glance](#at-a-glance)
 - [Threat model](#threat-model)
 - [Pre-flight (before any section runs)](#pre-flight-before-any-section-runs)
-- [1/20 — System updates](#120-system-updates)
-- [2/20 — Automatic security updates](#220-automatic-security-updates)
-- [3/20 — Sudo user](#320-sudo-user)
-- [4/20 — SSH key copy](#420-ssh-key-copy)
-- [5/20 — SSH safety check (first run only)](#520-ssh-safety-check-first-run-only)
-- [6/20 — SSH hardening](#620-ssh-hardening)
-- [7/20 — Firewall (UFW)](#720-firewall-ufw)
-- [8/20 — fail2ban (brute-force protection)](#820-fail2ban-brute-force-protection)
-- [9/20 — Kernel hardening (sysctl)](#920-kernel-hardening-sysctl)
-- [10/20 — AppArmor](#1020-apparmor)
-- [11/20 — Monitoring (Cockpit + Netdata)](#1120-monitoring-cockpit-netdata)
-- [12/20 — Intrusion detection (rkhunter + auditd + AIDE)](#1220-intrusion-detection-rkhunter-auditd-aide)
+- [1/20 — System updates](#120--system-updates)
+- [2/20 — Automatic security updates](#220--automatic-security-updates)
+- [3/20 — Sudo user](#320--sudo-user)
+- [4/20 — SSH key copy](#420--ssh-key-copy)
+- [5/20 — SSH safety check (first run only)](#520--ssh-safety-check-first-run-only)
+- [6/20 — SSH hardening](#620--ssh-hardening)
+- [7/20 — Firewall (UFW)](#720--firewall-ufw)
+- [8/20 — fail2ban (brute-force protection)](#820--fail2ban-brute-force-protection)
+- [9/20 — Kernel hardening (sysctl)](#920--kernel-hardening-sysctl)
+- [10/20 — AppArmor](#1020--apparmor)
+- [11/20 — Monitoring (Cockpit + Netdata)](#1120--monitoring-cockpit--netdata)
+- [12/20 — Intrusion detection (rkhunter + auditd + AIDE)](#1220--intrusion-detection-rkhunter--auditd--aide)
   - [rkhunter](#rkhunter)
   - [AIDE (Advanced Intrusion Detection Environment)](#aide-advanced-intrusion-detection-environment)
   - [auditd](#auditd)
-- [13/20 — Legal banners](#1320-legal-banners)
-- [14/20 — Password policy (login.defs)](#1420-password-policy-logindefs)
-- [15/20 — Debian goodies + PAM strength](#1520-debian-goodies-pam-strength)
-- [16/20 — Disable unused kernel modules + restrict compilers](#1620-disable-unused-kernel-modules-restrict-compilers)
+- [13/20 — Legal banners](#1320--legal-banners)
+- [14/20 — Password policy (login.defs)](#1420--password-policy-logindefs)
+- [15/20 — Debian goodies + PAM strength](#1520--debian-goodies--pam-strength)
+- [16/20 — Disable unused kernel modules + restrict compilers](#1620--disable-unused-kernel-modules--restrict-compilers)
   - [Kernel module blacklist](#kernel-module-blacklist)
   - [Compiler restriction](#compiler-restriction)
-- [17/20 — Process accounting (acct + sysstat)](#1720-process-accounting-acct-sysstat)
-- [18/20 — Security audit (Lynis)](#1820-security-audit-lynis)
-- [19/20 — Operator tooling](#1920-operator-tooling)
-- [20/20 — Remote syslog (optional)](#2020-remote-syslog-optional)
+- [17/20 — Process accounting (acct + sysstat)](#1720--process-accounting-acct--sysstat)
+- [18/20 — Security audit (Lynis)](#1820--security-audit-lynis)
+- [19/20 — Operator tooling](#1920--operator-tooling)
+- [20/20 — Remote syslog (optional)](#2020--remote-syslog-optional)
 - [Where things live (paths cheatsheet)](#where-things-live-paths-cheatsheet)
 - [How to use the box after the script runs](#how-to-use-the-box-after-the-script-runs)
 - [What re-running the script does (and doesn't)](#what-re-running-the-script-does-and-doesnt)
@@ -240,7 +240,7 @@ sudo sshd -T | grep -iE 'permitroot|passwordauth|pubkeyauth|maxauthtries'
 
 **Threat model:** Without a firewall, every service that binds to `0.0.0.0` is exposed to the entire internet. With UFW, only the three ports you explicitly allow accept connections. Everything else (databases listening on default ports, dev servers, monitoring daemons) is dropped at the kernel level.
 
-**Note on Cockpit (9090) and Netdata (19999):** These ports are *deliberately not opened* in UFW. If you opted in to monitoring (section 11), you reach them via SSH tunnel only.
+**Note on Cockpit (9090) and Netdata (19999):** These ports are *deliberately not opened* in UFW, and section 11 also binds both services to loopback, so there are two layers. If you opted in to monitoring, you reach them via SSH tunnel only.
 
 **Verify after:**
 ```bash
@@ -334,8 +334,10 @@ You should see profiles listed under "enforce mode." Six is typical on a fresh D
 
 **Files/state changed (when opted in):**
 - Package: `cockpit`
-- Service: `cockpit.socket` enabled (web on port 9090, localhost-bound)
-- Netdata installed to `/opt/netdata/` via its kickstart script (web on port 19999, also bound)
+- Service: `cockpit.socket` enabled, bound to `127.0.0.1:9090` (and `[::1]:9090` when IPv6 is up on `lo`) by the drop-in `/etc/systemd/system/cockpit.socket.d/listen.conf`
+- Netdata installed via its kickstart script, bound to `127.0.0.1` (and `::1`) on port 19999 by `[web] bind to` in `netdata.conf` (`/etc/netdata/` for package installs, `/opt/netdata/etc/netdata/` for static ones)
+
+Without that binding, both listen on every address by default, and UFW alone would keep them private. Binding them to loopback means a wrong UFW rule, or `ufw disable` while debugging, can't expose them. Every `base.sh` run reapplies it and reports `✓ … bound to loopback only`, or a warning that lists any address that still isn't loopback.
 
 **Cockpit (port 9090):** Web UI for server management — view services, logs, network interfaces, accounts, software updates, terminal access. Think "GUI for systemd."
 
