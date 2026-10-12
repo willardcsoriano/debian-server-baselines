@@ -14,7 +14,7 @@ note()    { echo -e "  ${DIM}$1${NC}"; }
 
 # ─── Preflight ────────────────────────────────────────────────────────────────
 
-clear
+clear 2>/dev/null || true   # cosmetic; must not abort a run with no TERM
 echo -e "${BOLD}dev.sh${NC}"
 echo -e "${DIM}Debian 13 developer tooling — run as your sudo user, after base.sh${NC}"
 echo ""

@@ -14,7 +14,7 @@ note()    { echo -e "  ${DIM}$1${NC}"; }
 
 # ─── Preflight ────────────────────────────────────────────────────────────────
 
-clear
+clear 2>/dev/null || true   # cosmetic; must not abort a run with no TERM
 echo -e "${BOLD}prod.sh${NC}"
 echo -e "${DIM}Debian 13 prod host — container runtime only, no dev tooling${NC}"
 echo ""
