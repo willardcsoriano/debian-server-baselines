@@ -14,7 +14,7 @@ note()    { echo -e "  ${DIM}$1${NC}"; }
 
 # ─── Preflight ────────────────────────────────────────────────────────────────
 
-clear
+clear 2>/dev/null || true   # cosmetic; must not abort a run with no TERM
 echo -e "${BOLD}wireguard.sh${NC}"
 echo -e "${DIM}WireGuard peer — run as root, after base.sh${NC}"
 echo ""
