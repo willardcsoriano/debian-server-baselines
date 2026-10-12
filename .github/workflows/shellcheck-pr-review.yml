@@ -1,0 +1,47 @@
+name: Shellcheck PR Review
+
+# Free, deterministic review: runs shellcheck on every changed shell script
+# and posts the result as a COMMENT review from github-actions[bot]. Not
+# APPROVE -- GitHub refuses APPROVE reviews from the default Actions token
+# as an anti-self-approval safeguard. A record, not a merge gate: no branch
+# protection or required check depends on it.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Run shellcheck on changed shell scripts
+        run: |
+          set -o pipefail
+          git fetch origin "${{ github.event.pull_request.base.ref }}" --depth=1
+          CHANGED=$(git diff --name-only --diff-filter=d "origin/${{ github.event.pull_request.base.ref }}...HEAD" -- '*.sh' '*.bash' || true)
+          if [ -z "$CHANGED" ]; then
+            echo "No shell scripts changed in this PR." > review.md
+          else
+            FINDINGS=$(echo "$CHANGED" | xargs shellcheck 2>&1 || true)
+            if [ -z "$FINDINGS" ]; then
+              { echo "shellcheck found no issues in:"; echo "$CHANGED" | sed 's/^/- `/; s/$/`/'; } > review.md
+            else
+              { echo "## shellcheck results"; echo; echo '```'; echo "$FINDINGS"; echo '```'; } > review.md
+            fi
+          fi
+
+      - name: Post as a GitHub review
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh pr review "${{ github.event.pull_request.number }}" \
+            --comment \
+            --body-file review.md
