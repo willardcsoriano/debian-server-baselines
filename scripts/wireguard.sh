@@ -60,8 +60,10 @@ if [[ $RERUN -eq 0 ]]; then
   read -rp "  Listen port [51820]: " LISTEN_PORT </dev/tty
   LISTEN_PORT="${LISTEN_PORT// /}"
   LISTEN_PORT="${LISTEN_PORT:-51820}"
-  [[ "$LISTEN_PORT" =~ ^[0-9]+$ ]] && [[ "$LISTEN_PORT" -ge 1 ]] && [[ "$LISTEN_PORT" -le 65535 ]] \
-    || fail "Invalid port: $LISTEN_PORT"
+  # 10#: a leading zero would otherwise be parsed as octal ("08" is an error).
+  [[ "$LISTEN_PORT" =~ ^[0-9]{1,5}$ ]] || fail "Invalid port: $LISTEN_PORT"
+  LISTEN_PORT=$((10#$LISTEN_PORT))
+  (( LISTEN_PORT >= 1 && LISTEN_PORT <= 65535 )) || fail "Invalid port: $LISTEN_PORT"
 
   read -rp "  Enable IP forwarding? (needed if this host routes traffic for others) [y/N]: " _fwd </dev/tty
   [[ "${_fwd,,}" == "y" ]] && IP_FORWARD=1
