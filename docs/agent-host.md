@@ -122,6 +122,27 @@ It works through these steps in order:
 
 Upgrading from cx43 (16 GB, €18.49/mo) to cx53 (32 GB, €34.99/mo) is warranted by **memory pressure, not session count**. Idle sessions live in swap and cost disk, not RAM. The signal is `check-dev` (dotfiles) or `/proc/pressure/memory` showing `some avg60` ≥ 5% repeatedly during normal work, or available RAM under 15% with swap full. Before upgrading, re-check `hcloud server-type describe cx53` for availability in the server's location. The snapshot-migration runbook is in [HETZNER-CLOUD.md](HETZNER-CLOUD.md).
 
+## Logs and failure reports
+
+Every run of `dev.sh` and `docker-upgrade.sh` is logged in full, and each ends with a single greppable `RESULT:` line.
+
+| Script | Log |
+|---|---|
+| `dev.sh` | `~/.local/state/debian-server-baselines/dev-<timestamp>-<pid>.log` |
+| `docker-upgrade.sh` | `~/.local/state/docker-upgrade/<timestamp>-<pid>/run.log`, next to the recorded package versions and running containers |
+
+- **On success:** `RESULT: OK (…, N warning(s))`, preceded by the list of warnings, each tagged with its section.
+- **On failure:** the failing section, line, command and exit code, then `RESULT: FAILED in section '…'`. If `docker-upgrade.sh` had already upgraded packages before failing, it also prints the exact rollback command.
+- **sudo:** both scripts ask for your password once, at the start, and keep the credential alive for the whole run, so a long step never stalls at a hidden prompt. The password is read from the terminal and never reaches the log.
+- **Permissions:** logs are mode 600 in a mode 700 directory.
+- **Terminal required:** the scripts need a real terminal for that prompt. Run them from your own terminal (`ssh -t host 'bash dev.sh'`), not from a tool that has no terminal; there they stop at preflight with `sudo authentication failed` and change nothing.
+
+Quick check after a run:
+
+```bash
+grep -h '^RESULT' ~/.local/state/debian-server-baselines/dev-*.log | tail -1
+```
+
 ## Verification
 
 ```bash

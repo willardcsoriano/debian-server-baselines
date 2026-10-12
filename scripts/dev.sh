@@ -1,20 +1,60 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -Eeuo pipefail   # -E: the ERR trap below also fires inside functions
 
 # ─── Output helpers ───────────────────────────────────────────────────────────
 
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'
 BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
 
+WARNINGS=()
+CURRENT_SECTION="preflight"
+
 pass()    { echo -e "  ${GREEN}✓${NC} $1"; }
-warn()    { echo -e "  ${YELLOW}⚠${NC} $1"; }
+warn()    { echo -e "  ${YELLOW}⚠${NC} $1"; WARNINGS+=("[$CURRENT_SECTION] $1"); }
 fail()    { echo -e "\n  ${RED}✗${NC} $1\n"; exit 1; }
-section() { echo -e "\n${BOLD}▸ $1${NC}"; }
+section() { CURRENT_SECTION="$1"; echo -e "\n${BOLD}▸ $1${NC}  ${DIM}$(date +%H:%M:%S)${NC}"; }
 note()    { echo -e "  ${DIM}$1${NC}"; }
+
+# ─── Logging and error reporting ──────────────────────────────────────────────
+
+clear 2>/dev/null || true   # cosmetic; must not abort a run with no TERM
+
+# Every run is logged in full (mode 600 -- it records hostnames and paths, no
+# secrets: sudo reads its password from the terminal, never from this stream).
+LOG_DIR="$HOME/.local/state/debian-server-baselines"
+mkdir -p "$LOG_DIR" && chmod 700 "$LOG_DIR"
+LOG="$LOG_DIR/dev-$(date +%Y%m%d-%H%M%S)-$$.log"
+( umask 077 && : > "$LOG" )
+exec > >(tee -a "$LOG") 2>&1
+
+# Name the failing command, line and section instead of dying silently.
+on_err() {
+  local rc=$? line=$1 cmd=$2
+  echo -e "\n  ${RED}✗${NC} Failed in section '$CURRENT_SECTION' at line $line (exit $rc):"
+  echo -e "    ${DIM}$cmd${NC}"
+}
+trap 'on_err "$LINENO" "$BASH_COMMAND"' ERR
+
+# Always end with a summary and one greppable RESULT line, success or not.
+on_exit() {
+  local rc=$?
+  [[ -n "${SUDO_KEEPALIVE_PID:-}" ]] && kill "$SUDO_KEEPALIVE_PID" 2>/dev/null
+  echo ""
+  if (( ${#WARNINGS[@]} )); then
+    echo -e "${YELLOW}Warnings (${#WARNINGS[@]}):${NC}"
+    printf '  - %s\n' "${WARNINGS[@]}"
+  fi
+  if (( rc == 0 )); then
+    echo "RESULT: OK ($(date -Is), ${#WARNINGS[@]} warning(s))"
+  else
+    echo "RESULT: FAILED in section '$CURRENT_SECTION' (exit $rc, $(date -Is))"
+  fi
+  echo "Log: $LOG"
+}
+trap on_exit EXIT
 
 # ─── Preflight ────────────────────────────────────────────────────────────────
 
-clear 2>/dev/null || true   # cosmetic; must not abort a run with no TERM
 echo -e "${BOLD}dev.sh${NC}"
 echo -e "${DIM}Debian 13 developer tooling — run as your sudo user, after base.sh${NC}"
 echo ""
@@ -51,6 +91,14 @@ _user_bus="/run/user/$_user_uid/bus"
   || fail "No user session at $_user_bus. Log in via SSH as $USER and re-run."
 
 pass "Preflight OK — $USER, session confirmed"
+
+# Ask for the sudo password once, up front, and keep the credential fresh so
+# a slow step (nvm, apt) can't leave a later step waiting at a prompt.
+sudo -v || fail "sudo authentication failed"
+( while kill -0 $$ 2>/dev/null; do sudo -n true 2>/dev/null || true; sleep 50; done ) &
+SUDO_KEEPALIVE_PID=$!
+pass "sudo credential cached for this run"
+note "Logging to $LOG"
 echo ""
 
 # ─── 1/9  Docker Engine (rootless) + Compose ─────────────────────────────────
@@ -773,6 +821,56 @@ echo "{ \"cleanupPeriodDays\": $CLAUDE_RETENTION_DAYS }" \
   | sudo tee /etc/claude-code/managed-settings.d/50-agent-host-retention.json > /dev/null
 sudo chmod 0644 /etc/claude-code/managed-settings.d/50-agent-host-retention.json
 pass "Claude Code transcript retention: ${CLAUDE_RETENTION_DAYS} days (managed setting)"
+
+# ── Verify ────────────────────────────────────────────────────────────────────
+
+# Check the live state, not just that the install commands returned 0.
+section "9/9  Verify agent host"
+_swap_kb=$(awk '/^SwapTotal:/ { print $2 }' /proc/meminfo)
+if (( _swap_kb + _gib >= SWAP_TARGET_GB * _gib )); then
+  pass "Swap active: $(( (_swap_kb + _gib / 2) / _gib )) GiB"
+else
+  warn "Swap is $(( _swap_kb / _gib )) GiB, below the ${SWAP_TARGET_GB} GiB target"
+fi
+
+if systemctl is-active --quiet agent-oom-priority.timer \
+   && [[ "$(systemctl show -p Result --value agent-oom-priority.service)" == "success" ]]; then
+  pass "agent-oom-priority.timer active, last run succeeded"
+else
+  warn "agent-oom-priority not healthy -- journalctl -u agent-oom-priority.service"
+fi
+_tmux_srv=$(pgrep -x 'tmux: server' | head -1 || true)
+if [[ -n "$_tmux_srv" ]]; then
+  _adj=$(cat "/proc/$_tmux_srv/oom_score_adj")
+  if [[ "$_adj" == "-500" ]]; then
+    pass "tmux server oom_score_adj = -500"
+  else
+    warn "tmux server oom_score_adj is $_adj, expected -500"
+  fi
+else
+  note "No tmux server running -- OOM priority applies when one starts"
+fi
+
+if XDG_RUNTIME_DIR="/run/user/$_user_uid" systemctl --user is-active --quiet agent-sessions-snapshot.timer; then
+  pass "agent-sessions-snapshot.timer active"
+else
+  warn "agent-sessions-snapshot.timer not active -- systemctl --user status agent-sessions-snapshot.timer"
+fi
+_manifest="$HOME/.local/state/agent-sessions/manifest.json"
+if jq -e '.sessions | type == "array"' "$_manifest" > /dev/null 2>&1; then
+  _n=$(jq '.sessions | length' "$_manifest")
+  _no_id=$(jq '[.sessions[] | select(.kind == "claude" and (.sessionId // "") == "")] | length' "$_manifest")
+  pass "agent-sessions recorded $_n tmux session(s)"
+  (( _no_id == 0 )) || warn "$_no_id claude session(s) recorded without a conversation ID -- ~/.claude/sessions format may have changed (see docs/agent-host.md)"
+else
+  warn "agent-sessions manifest missing or invalid: $_manifest"
+fi
+
+if [[ "$(jq -r '.cleanupPeriodDays' /etc/claude-code/managed-settings.d/50-agent-host-retention.json 2>/dev/null)" == "$CLAUDE_RETENTION_DAYS" ]]; then
+  pass "Managed retention file valid (${CLAUDE_RETENTION_DAYS} days)"
+else
+  warn "Managed retention file missing or not valid JSON"
+fi
 
 # ─── Summary ─────────────────────────────────────────────────────────────────
 
