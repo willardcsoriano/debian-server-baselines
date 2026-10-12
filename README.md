@@ -30,6 +30,7 @@ Idempotent hardening and role-specific tooling for Debian 13 servers. Every serv
 - [What happens](#what-happens)
 - [Idempotent — safe to re-run](#idempotent-safe-to-re-run)
 - [After it runs](#after-it-runs)
+- [Contributing](#contributing)
 
 ## Setup
 
@@ -214,3 +215,25 @@ ssh -N -L 19999:localhost:19999 youruser@your-server-ip
 ```
 
 Lynis report: `/var/log/lynis.log`
+
+## Contributing
+
+Every change follows issue → commits → PR → review:
+
+1. **Issue.** Title it in Conventional Commits form, e.g. `fix(dev): swap file refuses on xfs`. The bug, feature and incident forms prefill that shape. `issue-labeler.yml` then labels the issue from its title:
+
+   | Title | Labels |
+   |---|---|
+   | `fix` / `feat` / `docs` / `perf` | `bug` / `enhancement` / `documentation` / `performance` |
+   | `refactor`, `style`, `test`, `build`, `ci`, `chore`, `revert` | `maintenance` |
+   | `(scope)`, comma-separated allowed | `area:<scope>` |
+   | `!` before the colon | `breaking` |
+   | the word "incident" | `incident` |
+   | anything else | `needs-triage`, plus one comment explaining the format |
+
+   Retitling an issue updates its labels. Labels added by hand are never removed.
+2. **Commits.** One per concern on a feature branch, with Conventional Commits subjects.
+3. **PR.** The template opens with `Closes #`, so merging closes the issue.
+4. **Review.** `shellcheck-pr-review.yml` posts shellcheck's findings on every PR as a review. It's a record, not a merge gate.
+
+Issues track work; knowledge that should outlive it goes in `docs/`, which the issue links to. Labeler tests: `bash .github/scripts/label-issue.test.sh`.
