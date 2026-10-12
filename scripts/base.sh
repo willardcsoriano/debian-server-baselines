@@ -12,6 +12,73 @@ fail()    { echo -e "\n  ${RED}✗${NC} $1\n"; exit 1; }
 section() { echo -e "\n${BOLD}▸ $1${NC}"; }
 note()    { echo -e "  ${DIM}$1${NC}"; }
 
+# ─── Monitoring: loopback-only listeners ──────────────────────────────────────
+# Cockpit (9090) and Netdata (19999) are reached only through an SSH tunnel.
+# UFW already blocks both ports, but by default they listen on every address,
+# so one wrong UFW rule or an `ufw disable` while debugging would expose two
+# admin UIs.  Binding them to loopback makes the tunnel the only way in.
+# Idempotent; runs on every base.sh pass that finds monitoring installed.
+# Per the Cockpit guide ("listen") and Netdata's "securing agents" docs.
+bind_monitoring_to_loopback() {
+  local v6=0 changed conf f addrs tmp
+  [[ "$(cat /proc/sys/net/ipv6/conf/lo/disable_ipv6 2>/dev/null)" == 0 ]] && v6=1
+
+  if systemctl cat cockpit.socket >/dev/null 2>&1; then
+    tmp=$(mktemp)
+    # An empty ListenStream= resets the unit's default (all addresses, 9090).
+    printf '%s\n' '[Socket]' 'ListenStream=' 'ListenStream=127.0.0.1:9090' > "$tmp"
+    if (( v6 )); then echo 'ListenStream=[::1]:9090' >> "$tmp"; fi
+    install -d -m 0755 /etc/systemd/system/cockpit.socket.d
+    if ! cmp -s "$tmp" /etc/systemd/system/cockpit.socket.d/listen.conf; then
+      install -m 0644 "$tmp" /etc/systemd/system/cockpit.socket.d/listen.conf
+      systemctl daemon-reload
+      systemctl restart cockpit.socket
+    fi
+    rm -f "$tmp"
+    if ! ss -tlnH 'sport = :9090' | grep -q .; then
+      warn "cockpit.socket isn't listening on 9090 (systemctl status cockpit.socket)"
+    elif ss -tlnH 'sport = :9090' | awk '{print $4}' | grep -qvE '^(127\.0\.0\.1|\[::1\]):9090$'; then
+      warn "Cockpit still listens beyond loopback: $(ss -tlnH 'sport = :9090' | awk '{print $4}' | tr '\n' ' ')"
+    else
+      pass "Cockpit bound to loopback only"
+    fi
+  fi
+
+  conf=""
+  for f in /etc/netdata/netdata.conf /opt/netdata/etc/netdata/netdata.conf; do
+    [[ -d "${f%/*}" ]] && { conf=$f; break; }
+  done
+  if [[ -n "$conf" ]]; then
+    addrs="127.0.0.1"; (( v6 )) && addrs="127.0.0.1 ::1"
+    [[ -f "$conf" ]] || install -m 0644 /dev/null "$conf"
+    tmp=$(mktemp)
+    # Set `bind to` inside [web], replacing any existing (or commented) value;
+    # add the section if the file has none.
+    awk -v bind="$addrs" '
+      function emit() { print "    bind to = " bind; done = 1 }
+      /^[[:space:]]*\[/ { if (inweb && !done) emit(); inweb = ($0 ~ /^[[:space:]]*\[web\][[:space:]]*$/) }
+      inweb && /^[[:space:]]*#?[[:space:]]*bind to[[:space:]]*=/ { if (!done) emit(); next }
+      { print }
+      END { if (inweb && !done) emit(); if (!done) { print ""; print "[web]"; emit() } }
+    ' "$conf" > "$tmp"
+    changed=0
+    cmp -s "$tmp" "$conf" || { install -m 0644 "$tmp" "$conf"; changed=1; }
+    rm -f "$tmp"
+    if (( changed )); then systemctl restart netdata; fi
+    local _
+    for _ in 1 2 3 4 5 6 7 8 9 10; do   # give a restarted Netdata up to 10 s to listen
+      ss -tlnH 'sport = :19999' | grep -q . && break; sleep 1
+    done
+    if ! ss -tlnH 'sport = :19999' | grep -q .; then
+      warn "Netdata isn't listening on 19999 (systemctl status netdata)"
+    elif ss -tlnH 'sport = :19999' | awk '{print $4}' | grep -qvE '^(127\.0\.0\.1|\[::1\]):19999$'; then
+      warn "Netdata still listens beyond loopback: $(ss -tlnH 'sport = :19999' | awk '{print $4}' | tr '\n' ' ')"
+    else
+      pass "Netdata bound to loopback only ($conf)"
+    fi
+  fi
+}
+
 # ─── Preflight ────────────────────────────────────────────────────────────────
 
 clear 2>/dev/null || true   # cosmetic; must not abort a run with no TERM
