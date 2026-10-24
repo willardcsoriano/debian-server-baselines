@@ -212,7 +212,7 @@ ssh-keygen -l -f /home/<user>/.ssh/authorized_keys   # show key fingerprint
 | `PasswordAuthentication` | `no` | Brute-force password attacks against SSH stop working entirely. |
 | `PubkeyAuthentication` | `yes` | Only way in now: cryptographic key. |
 | `MaxAuthTries` | `3` | Connection drops after 3 wrong attempts — fail2ban (section 8) bans you for 1h after 5 such drops. |
-| `LoginGraceTime` | `30` | If you don't complete login in 30s, you're disconnected. Limits slow scanning. |
+| `LoginGraceTime` | `60` | If you don't complete login in 60s, you're disconnected. Limits slow scanning. The clock starts at TCP connect, so 30s was too short for a key login over a lossy long-haul link (the key exchange alone can take 20-30s); 60s still bounds pre-auth exposure alongside `MaxStartups`, `PerSourcePenalties` and fail2ban. |
 | `X11Forwarding` | `no` | Server isn't running X — no reason to expose the protocol. |
 | `AllowTcpForwarding` | `local` | Allows SSH tunnels from your laptop (VS Code Remote, Cockpit, Netdata) while blocking your box from being used as a TCP relay to other machines. |
 | `AllowAgentForwarding` | `no` | Prevents accidentally forwarding your local SSH agent to a compromised server. |
