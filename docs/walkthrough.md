@@ -216,8 +216,9 @@ ssh-keygen -l -f /home/<user>/.ssh/authorized_keys   # show key fingerprint
 | `X11Forwarding` | `no` | Server isn't running X — no reason to expose the protocol. |
 | `AllowTcpForwarding` | `local` | Allows SSH tunnels from your laptop (VS Code Remote, Cockpit, Netdata) while blocking your box from being used as a TCP relay to other machines. |
 | `AllowAgentForwarding` | `no` | Prevents accidentally forwarding your local SSH agent to a compromised server. |
-| `MaxSessions` | `2` | Caps how many concurrent SSH channels one connection can open. |
-| `ClientAliveCountMax` | `2` | Idle connections get pruned. |
+| `MaxSessions` | `10` | Caps how many concurrent SSH channels one connection can open. 10 is the OpenSSH default and fits IDE remotes (VS Code Remote-SSH, JetBrains Gateway) that open 5-10 channels per connection. |
+| `ClientAliveInterval` | `60` | Server pings the client every 60s, keeping NAT-traversed tunnels alive. |
+| `ClientAliveCountMax` | `3` | A client that misses 3 pings (~3 min) is dropped, so dead connections get pruned. |
 | `LogLevel` | `VERBOSE` | More detail in `/var/log/auth.log` for forensics. |
 | `TCPKeepAlive` | `no` | Use SSH's own keepalive (more honest about idle state). |
 | `AllowUsers` | _sudo group_ | Explicit allowlist of every sudo group member (minus root). Closes the door on any local account that isn't explicitly a sudoer — `PermitRootLogin=no` blocks root, this blocks the rest by default. Re-derived on every re-run so new sudoers are picked up. The new user is always included explicitly as a safety guarantee even if group derivation is stale. |
