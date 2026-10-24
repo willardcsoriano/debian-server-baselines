@@ -297,13 +297,18 @@ set_sshd PermitRootLogin        no
 set_sshd PasswordAuthentication no
 set_sshd PubkeyAuthentication   yes
 set_sshd MaxAuthTries           3
-set_sshd LoginGraceTime         30
+# LoginGraceTime counts from TCP accept, so on a lossy long-haul link (~50%
+# loss, ~200 ms RTT) the key exchange alone can take 20-30s and a 30s grace
+# drops a legitimate key login ("Connection closed by ... port 22").  60s
+# gives such logins room to finish; pre-auth exposure stays bounded by
+# key-only auth, MaxAuthTries, MaxStartups, PerSourcePenalties and fail2ban.
+set_sshd LoginGraceTime         60
 set_sshd X11Forwarding          no
 set_sshd AllowTcpForwarding     local
 set_sshd AllowAgentForwarding   no
 # MaxSessions 10 matches the OpenSSH default and supports IDE-extension
 # workflows (VSCode Remote-SSH, JetBrains Gateway) that open 5–10 multiplexed
-# channels per connection.  MaxAuthTries 3, LoginGraceTime 30, fail2ban, and
+# channels per connection.  MaxAuthTries 3, LoginGraceTime 60, fail2ban, and
 # AllowUsers make the tighter historic value of 2 redundant without adding
 # meaningful protection against any realistic threat.
 set_sshd MaxSessions            10
