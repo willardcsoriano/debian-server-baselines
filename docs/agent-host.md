@@ -2,7 +2,7 @@
 
 ## Overview
 
-A dev server that keeps many AI agent sessions (Claude Code, Antigravity) alive in tmux for weeks needs four things a normal dev box doesn't: enough swap for idle sessions to page out into, an OOM policy that sacrifices the reconnectable VS Code server before an irreplaceable agent, a way to bring every session back after a reboot, and transcript retention longer than the longest idle stretch. `dev.sh` section 9/9 installs all four, and none of them changes the Hetzner bill. Docker is upgraded only on purpose, through `docker-upgrade.sh`; a `dev.sh` re-run never moves the engine. This page explains each piece, why it's built that way, how to operate it day to day and after a reboot, and when to buy more RAM instead. It was written after a 2026-10-12 review of a cx43 (16 GB) host running ten agent sessions.
+A dev server that keeps many AI agent sessions (Claude Code, Antigravity) alive in tmux for weeks needs five things a normal dev box doesn't: enough swap for idle sessions to page out into, an OOM policy that sacrifices the reconnectable VS Code server before an irreplaceable agent, a way to bring every session back after a reboot, transcript retention longer than the longest idle stretch, and a way to clear the `vscode-server` trees a bad reconnect leaves behind before they pile up and exhaust that same memory. `dev.sh` section 9/9 installs all five, and none of them changes the Hetzner bill. Docker is upgraded only on purpose, through `docker-upgrade.sh`; a `dev.sh` re-run never moves the engine. This page explains each piece, why it's built that way, how to operate it day to day and after a reboot, and when to buy more RAM instead. It was written after a 2026-10-12 review of a cx43 (16 GB) host running ten agent sessions.
 
 ## Table of Contents
 
@@ -13,8 +13,10 @@ A dev server that keeps many AI agent sessions (Claude Code, Antigravity) alive 
   - [b. OOM priority](#b-oom-priority)
   - [c. Session snapshot and restore](#c-session-snapshot-and-restore)
   - [d. Transcript retention](#d-transcript-retention)
+  - [e. VS Code server reaper](#e-vs-code-server-reaper)
 - [Docker upgrades](#docker-upgrades)
 - [When to buy more RAM](#when-to-buy-more-ram)
+- [Logs and failure reports](#logs-and-failure-reports)
 - [Verification](#verification)
 
 ## The problem this solves
@@ -26,6 +28,7 @@ Measured on the reference host (cx43, 8 vCPU / 16 GB RAM / 160 GB disk, 4 GB swa
 - Every process had `oom_score_adj = 0`. Each Claude session scored ~680 and vscode-server ~667, so under memory exhaustion the kernel would kill an agent first.
 - A reboot (including `make recover` / hard reset) would kill all ten sessions. Most were started with `claude -r`, so neither the command line nor any open file said which conversation each one held.
 - Claude Code deletes transcripts older than `cleanupPeriodDays` (default 30). One idle session's transcript was 28 days old, two days from deletion. Once a transcript is gone, that conversation can't be resumed.
+- A reconnect storm — a wifi switch, a client auto-update mid-session, a lossy mobile link — can leave behind `vscode-server` session trees with no client that will ever ask them to shut down. On a reference incident (2026-08-21), a single wifi switch orphaned three windows' worth of extension-host + language-server trees inside about an hour, driving swap to 100% full and load average to ~95 before anyone noticed.
 
 ## What `dev.sh` section 9/9 installs
 
@@ -35,6 +38,7 @@ Measured on the reference host (cx43, 8 vCPU / 16 GB RAM / 160 GB disk, 4 GB swa
 | OOM priority | `/usr/local/sbin/agent-oom-priority`, `agent-oom-priority.{service,timer}` (every 1 min) | root | edit `AGENT_ADJ` / `EDITOR_ADJ` in the script |
 | Session snapshot/restore | `~/.local/bin/agent-sessions`, `~/.config/systemd/user/agent-sessions-snapshot.{service,timer}` (every 5 min), a `hint` line in `~/.bashrc` | user | — |
 | Transcript retention | `/etc/claude-code/managed-settings.d/50-agent-host-retention.json` | — | `CLAUDE_RETENTION_DAYS` (default 90) |
+| VS Code server reaper | `/usr/local/bin/reap-vscode-{orphans,server}.sh`, `vscode-server-reap{,-orphans}.{service,timer}` | user | edit `MAX_AGE_HOURS` in `reap-vscode-server.sh` |
 
 Every piece is idempotent, and re-running `dev.sh` refreshes the installed files to the repo's version:
 
@@ -97,6 +101,15 @@ Claude Code's retention sweep runs after a session starts and deletes transcript
 3. When a client engagement ends, delete that project's transcripts under `~/.claude/projects/<project>/`.
 4. Consider an encrypted volume for `~/.claude` on hosts handling regulated data. The stock Debian image on Hetzner has no disk encryption.
 
+### e. VS Code server reaper
+
+`vscode-server` runs natively as this host's login user, entirely outside Docker — none of the per-container `mem_limit` work in [the SSH banner-timeout cascade report](reports/dev-vm-ssh-banner-timeout-cascade.md) protects against a `vscode-server` pile-up OOMing the host the same way an unbounded container used to. Two reapers run side by side, covering different accumulation speeds rather than one replacing the other:
+
+- **`reap-vscode-server.sh`** — age-based, every 6 hours. Kills any `vscode-server` session process (matched by its real binary path — `agent host`, `command-shell`, `code-server`, `server-main.js`, `bootstrap-fork`) older than `MAX_AGE_HOURS` (default 24), then sweeps leftover stale sockets under `/tmp/user/$UID`. Deliberately not connection-aware: accurately detecting "orphaned vs. currently connected" needs checking for a live peer on each session's control socket, which is fiddly to get right and risks the one failure mode that actually matters — killing a session someone is using. A flat age ceiling can't make that mistake; worst case it forces one reconnect.
+- **`reap-vscode-orphans.sh`** — structurally-safe, every 2 minutes. A reconnect storm can orphan a tree in minutes, well inside the 6-hour reaper's window: a single wifi switch has driven swap to 100% full and load average to ~95 in under an hour (see the problem statement above). This reaper only kills a `vscode-server` tree whose top-level launcher (the `agent host`/`command-shell` process sshd spawns directly per connection) has `PPID=1` — unambiguous evidence its parent SSH session has already died and the kernel has reparented it, never true for a tree still attached to a live session. No age heuristic, no liveness guess.
+
+Both install as root-owned systemd system units that run as the login user, same pattern as the OOM-priority piece above. Re-running `dev.sh` refreshes both scripts to the repo's version.
+
 ## Docker upgrades
 
 `dev.sh` and `prod.sh` install Docker with `apt-get install --no-upgrade`. A re-run installs what's missing but never upgrades the engine under running containers. Before this change, a re-run would silently have moved Docker 29.6.2 → 29.9.0 and containerd 2.2 → 2.4.
@@ -153,6 +166,8 @@ pgrep -f .vscode-server | head -3 | xargs -I{} cat /proc/{}/oom_score_adj   # 50
 systemctl --user list-timers agent-sessions-snapshot.timer
 agent-sessions list                                   # every agent session, state=live
 cat /etc/claude-code/managed-settings.d/50-agent-host-retention.json
+systemctl is-enabled vscode-server-reap.timer vscode-server-reap-orphans.timer
+systemctl list-timers vscode-server-reap.timer vscode-server-reap-orphans.timer   # next run within 6h / 2min
 ```
 
 AIDE will report the new files under `/usr/local/sbin`, `/etc/systemd/system` and `/etc/claude-code` on its next check. That's expected; re-baseline it after reviewing.

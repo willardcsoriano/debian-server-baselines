@@ -435,7 +435,7 @@ fi
 section "9/9  Long-running agent host"
 
 # For hosts that keep many long-lived AI agent sessions (claude, agy) in tmux.
-# Four failure modes, four fixes -- full rationale and operations in
+# Five failure modes, five fixes -- full rationale and operations in
 # docs/agent-host.md:
 #   a. Swap headroom: idle sessions page out and fill a small swap file,
 #      leaving no buffer for a burst (several VS Code windows).
@@ -449,6 +449,11 @@ section "9/9  Long-running agent host"
 #      resumed.  Raised machine-wide via managed settings.  PRIVACY: longer
 #      retention keeps more conversation data -- possibly client records --
 #      on disk; this host's disk is the boundary that has to protect it.
+#   e. VS Code server reaper: vscode-server runs outside Docker and outside
+#      any container mem_limit, so a reconnect storm (wifi switch, client
+#      auto-update mid-session) can pile up orphaned server trees until they
+#      exhaust memory themselves.  Two reapers, age-based and PPID=1-based,
+#      cover slow and fast accumulation respectively.
 # Tunables (env): SWAP_TARGET_GB (default 16), CLAUDE_RETENTION_DAYS (default 90)
 
 SWAP_TARGET_GB="${SWAP_TARGET_GB:-16}"
@@ -825,6 +830,125 @@ echo "{ \"cleanupPeriodDays\": $CLAUDE_RETENTION_DAYS }" \
 sudo chmod 0644 /etc/claude-code/managed-settings.d/50-agent-host-retention.json
 pass "Claude Code transcript retention: ${CLAUDE_RETENTION_DAYS} days (managed setting)"
 
+# ── e. VS Code server reaper ──────────────────────────────────────────────────
+
+# Two reapers, covering different accumulation speeds -- neither replaces the
+# other.  age-based: a coarse backstop for slow accumulation (e.g. a
+# version-mismatched client auto-update leaving a session nothing will ever
+# ask to shut down).  orphans: fast, structurally-safe for a reconnect storm
+# that can exhaust memory in under an hour (confirmed: a single wifi switch
+# drove swap to 100% and load average to ~95 in under an hour).
+sudo tee /usr/local/bin/reap-vscode-server.sh > /dev/null <<'REAP_SERVER_EOF'
+#!/usr/bin/env bash
+# reap-vscode-server.sh — kills vscode-server session trees older than
+# MAX_AGE_HOURS. Age-based, not connection-aware: a version-mismatched
+# reconnect can orphan a server tree with no client left that will ever ask
+# it to shut down, so this is a coarse backstop for that failure mode, not a
+# replacement for noticing stale windows.
+#
+# Installed by debian-server-baselines scripts/dev.sh (section 9/9); see
+# docs/agent-host.md. Re-running dev.sh overwrites this file.
+set -uo pipefail
+
+MAX_AGE_HOURS=24
+MAX_AGE_SECONDS=$((MAX_AGE_HOURS * 3600))
+
+COLUMNS=1000 ps -eo pid,etimes,args --no-headers \
+  | grep -E '\.vscode-server/(code-[0-9a-f]+ (agent host|command-shell)|cli/servers/[^ ]+/server/(bin/code-server|node .*out/(server-main\.js|bootstrap-fork)))' \
+  | while read -r pid etimes _rest; do
+      if [ "$etimes" -gt "$MAX_AGE_SECONDS" ]; then
+          logger -t reap-vscode-server "killing pid $pid, age ${etimes}s"
+          kill "$pid" 2>/dev/null || true
+      fi
+    done
+
+find /tmp/user/1000 -maxdepth 1 -name 'code-*' -type s -mmin "+$((MAX_AGE_HOURS * 60))" -delete 2>/dev/null || true
+REAP_SERVER_EOF
+sudo chmod 0755 /usr/local/bin/reap-vscode-server.sh
+
+sudo tee /usr/local/bin/reap-vscode-orphans.sh > /dev/null <<'REAP_ORPHANS_EOF'
+#!/usr/bin/env bash
+# reap-vscode-orphans.sh — kills vscode-server session trees whose parent SSH
+# session has already died (reparented to PID 1) -- catches a pileup within
+# minutes of a bad disconnect, rather than waiting for reap-vscode-server.sh's
+# 24h age-based backstop.
+#
+# Safe to run unattended and frequently, unlike a blanket kill: it only ever
+# touches a tree whose top-level launcher (the `command-shell`/`agent host`
+# process spawned directly by sshd for that connection) has PPID=1, which
+# structurally cannot be true for a tree still attached to a live session --
+# a live session's launcher always has a real sshd process as its parent.
+# No age heuristic, no guessing.
+#
+# Installed by debian-server-baselines scripts/dev.sh (section 9/9); see
+# docs/agent-host.md. Re-running dev.sh overwrites this file.
+set -uo pipefail
+
+kill_tree() {
+    local pid="$1" child
+    for child in $(pgrep -P "$pid" 2>/dev/null); do
+        kill_tree "$child"
+    done
+    kill -9 "$pid" 2>/dev/null || true
+}
+
+COLUMNS=1000 ps -eo pid,ppid,args --no-headers \
+  | grep -E '\.vscode-server/code-[0-9a-f]+ (agent host|command-shell)' \
+  | while read -r pid ppid _rest; do
+      if [ "$ppid" -eq 1 ]; then
+          logger -t reap-vscode-orphans "killing orphaned tree, root pid $pid (ppid=1, was $(ps -o etimes= -p "$pid" 2>/dev/null | tr -d ' ')s old)"
+          kill_tree "$pid"
+      fi
+    done
+REAP_ORPHANS_EOF
+sudo chmod 0755 /usr/local/bin/reap-vscode-orphans.sh
+
+sudo tee /etc/systemd/system/vscode-server-reap.service > /dev/null <<EOF
+[Unit]
+Description=Reap orphaned vscode-server sessions older than 24h
+
+[Service]
+Type=oneshot
+User=$USER
+ExecStart=/usr/local/bin/reap-vscode-server.sh
+EOF
+sudo tee /etc/systemd/system/vscode-server-reap.timer > /dev/null <<'EOF'
+[Unit]
+Description=Run vscode-server-reap.service every 6 hours
+
+[Timer]
+OnBootSec=15min
+OnUnitActiveSec=6h
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+sudo tee /etc/systemd/system/vscode-server-reap-orphans.service > /dev/null <<EOF
+[Unit]
+Description=Reap orphaned vscode-server session trees (PPID=1)
+
+[Service]
+Type=oneshot
+User=$USER
+ExecStart=/usr/local/bin/reap-vscode-orphans.sh
+EOF
+sudo tee /etc/systemd/system/vscode-server-reap-orphans.timer > /dev/null <<'EOF'
+[Unit]
+Description=Run vscode-server-reap-orphans.service every 2 minutes
+
+[Timer]
+OnBootSec=1min
+OnUnitActiveSec=2min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOF
+sudo systemctl daemon-reload
+sudo systemctl enable --now vscode-server-reap.timer vscode-server-reap-orphans.timer > /dev/null
+pass "VS Code server reaper: age-based every 6h, PPID=1 orphans every 2min"
+
 # ── Verify ────────────────────────────────────────────────────────────────────
 
 # Check the live state, not just that the install commands returned 0.
@@ -875,6 +999,13 @@ else
   warn "Managed retention file not readable as $USER, or not valid JSON -- Claude Code can't apply it (ls -ld /etc/claude-code)"
 fi
 
+if systemctl is-enabled --quiet vscode-server-reap.timer 2>/dev/null \
+   && systemctl is-enabled --quiet vscode-server-reap-orphans.timer 2>/dev/null; then
+  pass "VS Code server reaper timers enabled (6h age-based, 2min orphans)"
+else
+  warn "VS Code server reaper timer(s) not enabled -- systemctl list-timers 'vscode-server-reap*'"
+fi
+
 # ─── Summary ─────────────────────────────────────────────────────────────────
 
 echo ""
@@ -892,7 +1023,7 @@ echo -e "  ${GREEN}✓${NC} make: $(make --version | head -1)"
 echo -e "  ${GREEN}✓${NC} Bitwarden CLI: $BW_VER"
 echo -e "  ${GREEN}✓${NC} Bitwarden Secrets Manager CLI: $BWS_VER"
 echo -e "  ${GREEN}✓${NC} Antigravity CLI: $AGY_VER ${DIM}(native binary, no Node)${NC}"
-echo -e "  ${GREEN}✓${NC} Agent host: swap target ${SWAP_TARGET_GB} GiB, OOM priority timer, agent-sessions, ${CLAUDE_RETENTION_DAYS}-day transcript retention"
+echo -e "  ${GREEN}✓${NC} Agent host: swap target ${SWAP_TARGET_GB} GiB, OOM priority timer, agent-sessions, ${CLAUDE_RETENTION_DAYS}-day transcript retention, vscode-server reaper"
 echo ""
 echo -e "  Log in as: ${BOLD}ssh $USER@$SERVER_IP${NC}"
 echo -e "  ${YELLOW}Reload your shell${NC} (${DIM}exec \$SHELL -l${NC}) to activate nvm, DOCKER_HOST, and ~/.local/bin."
