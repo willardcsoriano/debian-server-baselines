@@ -111,6 +111,16 @@ make verify-hardening # confirm the mitigations above are actually live on dev, 
 
 `check`/`recover`/`postmortem` need no VM access until the final escalation step (`hcloud server reset`, a hard power-cycle) — in both diagnosed incidents, disk **write** I/O stayed at baseline throughout (only reads spiked, from the crash-restart cascade re-reading container/image layers), so a hard reset carried no observed data-loss risk to the VM itself. The standing, not-yet-realized risk is the two always-on Postgres containers (`bodego-postgres`, `turtley-db-1`) on this same VM: a hard power-cycle is not a clean shutdown, and an unlucky-timed reset mid-write is the actual worst-case exposure here (relying on WAL crash-recovery + ext4 journaling) — not VM destruction, but potential database corruption. This persists until `mem_limit` covers every stack on the box, not just `wfmctrading`.
 
+**Before any reset, rule out the client's network.** Twice a carrier or company network filtered port 22 to this VM, which looks exactly like a wedged `sshd`. The check takes seconds: if `ping dev` is clean and a TCP probe to another port answers at once (`nc -vz -w 5 dev 443` comes back "refused" immediately) while `ssh dev` hangs, the VM is up and the path is filtering SSH. Switch networks instead of resetting. `make recover` does not run this check itself yet.
+
+**Getting a console login.** `PermitRootLogin no` (set by `base.sh`) only applies to SSH, so root can still log in at the provider console:
+
+1. `make password-reset` sets and prints a new root password (`hcloud server reset-password`). The agent's auto-mode classifier blocks this target, so run it yourself.
+2. Open the server's **Console** in the Hetzner Cloud web UI. The `wss://` URL from `hcloud server request-console` is a VNC WebSocket for a VNC client and does not open in a browser tab.
+3. Log in as `root` with that password. To fix the admin account: `getent group sudo` shows who has sudo, then `passwd <user>`.
+
+The web console's keyboard mangles `|`, so type pipe-free commands there, one step at a time.
+
 The moment SSH comes back, capture the previous boot's logs before they rotate out — `journalctl --list-boots`, then `journalctl -b -1 --no-pager`, grepped in full if the tail doesn't show a clear trigger (the July 28 postmortem's default `tail -300` didn't reach back far enough).
 
 ## Later incidents on this VM (chronological index)
