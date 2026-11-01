@@ -1072,8 +1072,10 @@ else
   warn "VS Code server reaper timer(s) not enabled -- systemctl list-timers 'vscode-server-reap*'"
 fi
 
-if tmux -L dev-sh-verify -f "$HOME/.tmux.conf" start-server \; list-keys -T root WheelUpPane \; kill-server 2>/dev/null \
-   | grep -q 'alternate_on'; then
+# Captured, not piped to grep -q: under pipefail an early grep exit could
+# fail the pipeline on a good config.
+_wheel=$(tmux -L dev-sh-verify -f "$HOME/.tmux.conf" start-server \; list-keys -T root WheelUpPane \; kill-server 2>/dev/null || true)
+if [[ "$_wheel" == *alternate_on* ]]; then
   pass "tmux config parses; wheel follows the alternate screen"
 else
   warn "tmux config did not load cleanly -- tmux source-file ~/.tmux.conf"
