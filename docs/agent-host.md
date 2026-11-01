@@ -2,7 +2,7 @@
 
 ## Overview
 
-A dev server that keeps many AI agent sessions (Claude Code, Antigravity) alive in tmux for weeks needs five things a normal dev box doesn't: enough swap for idle sessions to page out into, an OOM policy that sacrifices the reconnectable VS Code server before an irreplaceable agent, a way to bring every session back after a reboot, transcript retention longer than the longest idle stretch, and a way to clear the `vscode-server` trees a bad reconnect leaves behind before they pile up and exhaust that same memory. `dev.sh` section 9/9 installs all five, and none of them changes the Hetzner bill. Docker is upgraded only on purpose, through `docker-upgrade.sh`; a `dev.sh` re-run never moves the engine. This page explains each piece, why it's built that way, how to operate it day to day and after a reboot, and when to buy more RAM instead. It was written after a 2026-10-12 review of a cx43 (16 GB) host running ten agent sessions.
+A dev server that keeps many AI agent sessions (Claude Code, Antigravity) alive in tmux for weeks needs six things a normal dev box doesn't: enough swap for idle sessions to page out into, an OOM policy that sacrifices the reconnectable VS Code server before an irreplaceable agent, a way to bring every session back after a reboot, transcript retention longer than the longest idle stretch, a way to clear the `vscode-server` trees a bad reconnect leaves behind before they pile up and exhaust that same memory, and a tmux config under which those sessions scroll and copy whichever renderer Claude Code uses. `dev.sh` section 9/9 installs all six, and none of them changes the Hetzner bill. Docker is upgraded only on purpose, through `docker-upgrade.sh`; a `dev.sh` re-run never moves the engine. This page explains each piece, why it's built that way, how to operate it day to day and after a reboot, and when to buy more RAM instead. It was written after a 2026-10-12 review of a cx43 (16 GB) host running ten agent sessions.
 
 ## Table of Contents
 
@@ -14,6 +14,7 @@ A dev server that keeps many AI agent sessions (Claude Code, Antigravity) alive 
   - [c. Session snapshot and restore](#c-session-snapshot-and-restore)
   - [d. Transcript retention](#d-transcript-retention)
   - [e. VS Code server reaper](#e-vs-code-server-reaper)
+  - [f. tmux config](#f-tmux-config)
 - [Docker upgrades](#docker-upgrades)
 - [When to buy more RAM](#when-to-buy-more-ram)
 - [Logs and failure reports](#logs-and-failure-reports)
@@ -39,6 +40,7 @@ Measured on the reference host (cx43, 8 vCPU / 16 GB RAM / 160 GB disk, 4 GB swa
 | Session snapshot/restore | `~/.local/bin/agent-sessions`, `~/.config/systemd/user/agent-sessions-snapshot.{service,timer}` (every 5 min), a `hint` line in `~/.bashrc` | user | — |
 | Transcript retention | `/etc/claude-code/managed-settings.d/50-agent-host-retention.json` | — | `CLAUDE_RETENTION_DAYS` (default 90) |
 | VS Code server reaper | `/usr/local/bin/reap-vscode-{orphans,server}.sh`, `vscode-server-reap{,-orphans}.{service,timer}` | user | edit `MAX_AGE_HOURS` in `reap-vscode-server.sh` |
+| tmux config | `~/.tmux.conf` (a differing old one is kept as `~/.tmux.conf.pre-dev-sh`) | user | edit the file in `dev.sh` |
 
 Every piece is idempotent, and re-running `dev.sh` refreshes the installed files to the repo's version:
 
@@ -110,6 +112,18 @@ Claude Code's retention sweep runs after a session starts and deletes transcript
 
 Both install as root-owned systemd system units that run as the login user, same pattern as the OOM-priority piece above. Re-running `dev.sh` refreshes both scripts to the repo's version.
 
+### f. tmux config
+
+Agent sessions are read and copied from inside tmux, often over SSH from a terminal that is not VS Code. Stock tmux gets both wrong for Claude Code, and which way it goes wrong depends on the renderer the session runs, so `dev.sh` writes `~/.tmux.conf` and loads it into a running server at once.
+
+- **Mouse on.** Without `mouse on`, wheel events pass through tmux to the app and never reach tmux's history.
+- **The wheel follows the alternate screen.** Claude Code has two renderers. The classic one writes the conversation into the terminal, so tmux's history holds it, but it also asks for the mouse, and stock tmux then hands it the wheel, which scrolls its input box. The fullscreen one (the `tui` setting, default for newer installs) draws on the alternate screen, like vim, where tmux keeps no history at all: a restarted session showed `history_size` 0. The binding sends wheel-up to tmux's copy mode on the main screen and to the app on the alternate screen, so both renderers scroll. In a fullscreen session, `Ctrl+o` then `[` writes the whole conversation into tmux's history when tmux search or copy is needed.
+- **Copies use the native command.** A drag in copy mode ends with `copy-selection-and-cancel`, and `set-clipboard on` sends the copy to the attached terminal with OSC 52. VS Code's terminal and kitty honour it; VTE terminals (XFCE Terminal, GNOME Terminal) drop it. Every copy, including one made inside fullscreen Claude Code, also lands in tmux's paste buffers, which keep the latest 50 (`tmux choose-buffer` to browse them).
+
+From a laptop whose terminal drops OSC 52, the dotfiles repo's `devclip watch` service puts each new paste buffer on the laptop clipboard: it holds one read-only tmux control-mode client over SSH and fetches each buffer tmux announces. It needs nothing on this host beyond tmux itself; see `notes/dev-clipboard.md` in dotfiles.
+
+The control-mode client counts as attached to whichever session it joined, so `session_attached` for that session reads 1 even with nobody looking at it.
+
 ## Docker upgrades
 
 `dev.sh` and `prod.sh` install Docker with `apt-get install --no-upgrade`. A re-run installs what's missing but never upgrades the engine under running containers. Before this change, a re-run would silently have moved Docker 29.6.2 → 29.9.0 and containerd 2.2 → 2.4.
@@ -168,6 +182,7 @@ agent-sessions list                                   # every agent session, sta
 cat /etc/claude-code/managed-settings.d/50-agent-host-retention.json
 systemctl is-enabled vscode-server-reap.timer vscode-server-reap-orphans.timer
 systemctl list-timers vscode-server-reap.timer vscode-server-reap-orphans.timer   # next run within 6h / 2min
+tmux list-keys -T root WheelUpPane                    # if-shell -F #{alternate_on} ...
 ```
 
 AIDE will report the new files under `/usr/local/sbin`, `/etc/systemd/system` and `/etc/claude-code` on its next check. That's expected; re-baseline it after reviewing.

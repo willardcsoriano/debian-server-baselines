@@ -137,7 +137,7 @@ Same Docker setup as `prod.sh`, plus:
 - GNU `make` for project-level orchestration
 - Bitwarden CLI (`bw`) — standalone binary from `bitwarden/clients` GitHub releases, installed to `~/.local/bin` (no `npm -g`)
 - Bitwarden Secrets Manager CLI (`bws`) — standalone binary from `bitwarden/sdk-sm` GitHub releases, sha256-verified, installed to `~/.local/bin`
-- Long-running agent host (section 9/9) — tops swap up to 16 GB, makes the OOM killer pick vscode-server before tmux agent sessions, records each tmux session's conversation ID so `agent-sessions restore` brings them all back after a reboot, and raises Claude Code transcript retention to 90 days. See [agent-host.md](docs/agent-host.md)
+- Long-running agent host (section 9/9) — tops swap up to 16 GB, makes the OOM killer pick vscode-server before tmux agent sessions, records each tmux session's conversation ID so `agent-sessions restore` brings them all back after a reboot, and raises Claude Code transcript retention to 90 days, and installs the tmux config those sessions scroll and copy under (`~/.tmux.conf`). See [agent-host.md](docs/agent-host.md)
 - Antigravity CLI (`agy`) — Google's native installer (`antigravity.google/cli/install.sh`) drops a SHA512-verified, Node-independent binary in `~/.local/bin/agy`. Replaces the Gemini CLI, which Google retired on 2026-06-18 (now paid-Enterprise-API-key only). Import old config with `agy plugin import gemini`
 
 ### syslog.sh — central log receiver

@@ -435,7 +435,7 @@ fi
 section "9/9  Long-running agent host"
 
 # For hosts that keep many long-lived AI agent sessions (claude, agy) in tmux.
-# Five failure modes, five fixes -- full rationale and operations in
+# Six failure modes, six fixes -- full rationale and operations in
 # docs/agent-host.md:
 #   a. Swap headroom: idle sessions page out and fill a small swap file,
 #      leaving no buffer for a burst (several VS Code windows).
@@ -454,6 +454,9 @@ section "9/9  Long-running agent host"
 #      auto-update mid-session) can pile up orphaned server trees until they
 #      exhaust memory themselves.  Two reapers, age-based and PPID=1-based,
 #      cover slow and fast accumulation respectively.
+#   f. tmux config: stock tmux gives the wheel to whatever app asks for the
+#      mouse and sends copies through a clipboard sequence many terminals
+#      drop, so scrolling and copying in agent sessions both break.
 # Tunables (env): SWAP_TARGET_GB (default 16), CLAUDE_RETENTION_DAYS (default 90)
 
 SWAP_TARGET_GB="${SWAP_TARGET_GB:-16}"
@@ -949,6 +952,69 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now vscode-server-reap.timer vscode-server-reap-orphans.timer > /dev/null
 pass "VS Code server reaper: age-based every 6h, PPID=1 orphans every 2min"
 
+# ── f. tmux config ────────────────────────────────────────────────────────────
+
+# Mouse, wheel and copy behaviour for the agent sessions, so they scroll and
+# copy whichever renderer Claude Code uses (see docs/agent-host.md, "f. tmux
+# config").  A ~/.tmux.conf that differs is kept as ~/.tmux.conf.pre-dev-sh
+# before it is replaced, and a running tmux server loads the new file at once.
+_tmux_conf="$HOME/.tmux.conf"
+_tmux_new=$(mktemp)
+cat > "$_tmux_new" <<'TMUX_CONF_EOF'
+# Installed by debian-server-baselines scripts/dev.sh (section 9/9); see
+# docs/agent-host.md. Re-running dev.sh overwrites this file.
+
+# mouse capture at the tmux layer -- without this, scroll wheel events pass
+# straight through tmux untouched to whatever app is running (e.g. Claude
+# Code's own mouse handling), never reaching tmux's own scrollback at all.
+set -g mouse on
+
+# Wheel-up goes to whichever side actually holds the text. tmux's default
+# hands the wheel to any app that requests mouse tracking (mouse_any_flag).
+# Claude Code's classic renderer requests it but writes the conversation into
+# tmux's own history, so that default scrolled its input box instead.
+# Here the wheel enters copy-mode (tmux's history) unless the app is on the
+# alternate screen. Full-screen apps such as vim, less and Claude Code's
+# fullscreen renderer (the `tui` setting) draw there, where tmux keeps no
+# history, so copy-mode would scroll nothing; they get the wheel and scroll
+# themselves. Once in copy-mode, the wheel is handled by copy-mode's own
+# bindings.
+bind-key -T root WheelUpPane if-shell -F '#{alternate_on}' 'send-keys -M' 'copy-mode -e'
+
+# Clipboard relay for tmux running on a headless remote host (dev has no X11,
+# no xclip -- there is no local clipboard on the machine tmux runs on at all).
+# set-clipboard makes tmux emit the xterm OSC 52 escape sequence, which the
+# *client* terminal (wherever you're actually sitting) intercepts and writes to
+# your real, local system clipboard -- works transparently over SSH, no
+# dependency on anything remote. Only if that terminal honours OSC 52: VS Code's
+# integrated terminal and kitty do; VTE-based ones (XFCE Terminal, GNOME
+# Terminal) silently drop it, so a drag here copies nothing. From those, hold
+# Shift while dragging to let the terminal select instead, then copy as usual.
+#
+# This only fires for text copied through tmux's own native copy commands
+# (copy-selection, copy-selection-and-cancel, etc.), not copy-pipe/
+# copy-pipe-and-cancel, which pipe to an external shell command instead and
+# never trigger the OSC 52 relay at all. tmux's own default mouse-drag-release
+# binding uses copy-pipe-and-cancel with no command specified -- effectively a
+# silent no-op on a host with no xclip -- which is why click-drag copy wasn't
+# working. Rebound below to use the native command so the relay actually fires.
+set -g set-clipboard on
+bind-key -T copy-mode    MouseDragEnd1Pane send-keys -X copy-selection-and-cancel
+bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-selection-and-cancel
+TMUX_CONF_EOF
+if [[ -f "$_tmux_conf" ]] && ! cmp -s "$_tmux_new" "$_tmux_conf"; then
+  cp "$_tmux_conf" "$_tmux_conf.pre-dev-sh"
+  note "Kept the previous ~/.tmux.conf as ~/.tmux.conf.pre-dev-sh"
+fi
+install -m 0644 "$_tmux_new" "$_tmux_conf"
+rm -f "$_tmux_new"
+if tmux has-session 2>/dev/null; then
+  tmux source-file "$_tmux_conf"
+  pass "tmux config installed and loaded into the running server"
+else
+  pass "tmux config installed (loads when tmux next starts)"
+fi
+
 # ── Verify ────────────────────────────────────────────────────────────────────
 
 # Check the live state, not just that the install commands returned 0.
@@ -1006,6 +1072,15 @@ else
   warn "VS Code server reaper timer(s) not enabled -- systemctl list-timers 'vscode-server-reap*'"
 fi
 
+# Captured, not piped to grep -q: under pipefail an early grep exit could
+# fail the pipeline on a good config.
+_wheel=$(tmux -L dev-sh-verify -f "$HOME/.tmux.conf" start-server \; list-keys -T root WheelUpPane \; kill-server 2>/dev/null || true)
+if [[ "$_wheel" == *alternate_on* ]]; then
+  pass "tmux config parses; wheel follows the alternate screen"
+else
+  warn "tmux config did not load cleanly -- tmux source-file ~/.tmux.conf"
+fi
+
 # ─── Summary ─────────────────────────────────────────────────────────────────
 
 echo ""
@@ -1023,7 +1098,7 @@ echo -e "  ${GREEN}✓${NC} make: $(make --version | head -1)"
 echo -e "  ${GREEN}✓${NC} Bitwarden CLI: $BW_VER"
 echo -e "  ${GREEN}✓${NC} Bitwarden Secrets Manager CLI: $BWS_VER"
 echo -e "  ${GREEN}✓${NC} Antigravity CLI: $AGY_VER ${DIM}(native binary, no Node)${NC}"
-echo -e "  ${GREEN}✓${NC} Agent host: swap target ${SWAP_TARGET_GB} GiB, OOM priority timer, agent-sessions, ${CLAUDE_RETENTION_DAYS}-day transcript retention, vscode-server reaper"
+echo -e "  ${GREEN}✓${NC} Agent host: swap target ${SWAP_TARGET_GB} GiB, OOM priority timer, agent-sessions, ${CLAUDE_RETENTION_DAYS}-day transcript retention, vscode-server reaper, tmux config"
 echo ""
 echo -e "  Log in as: ${BOLD}ssh $USER@$SERVER_IP${NC}"
 echo -e "  ${YELLOW}Reload your shell${NC} (${DIM}exec \$SHELL -l${NC}) to activate nvm, DOCKER_HOST, and ~/.local/bin."
