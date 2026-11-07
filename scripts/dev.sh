@@ -1006,6 +1006,13 @@ bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-selection-and-cance
 # "[#{session_name}] " cut to 10 characters, so "bizapps-internship" showed as
 # "[bizapps-i" and two sessions for one repo looked the same.
 set -g status-left-length 32
+
+# Name the session in the laptop's window title. Terminal windows attached to
+# dev otherwise all read alike in the window switcher (Alt+Tab), so finding
+# one session meant trying each window. tmux sets the outer terminal's title
+# to "dev: <session>" on attach and on every session switch.
+set -g set-titles on
+set -g set-titles-string 'dev: #S'
 TMUX_CONF_EOF
 if [[ -f "$_tmux_conf" ]] && ! cmp -s "$_tmux_new" "$_tmux_conf"; then
   cp "$_tmux_conf" "$_tmux_conf.pre-dev-sh"
@@ -1079,9 +1086,9 @@ fi
 
 # Captured, not piped to grep -q: under pipefail an early grep exit could
 # fail the pipeline on a good config.
-_wheel=$(tmux -L dev-sh-verify -f "$HOME/.tmux.conf" start-server \; list-keys -T root WheelUpPane \; show -gv status-left-length \; kill-server 2>/dev/null || true)
-if [[ "$_wheel" == *alternate_on* && "${_wheel##*$'\n'}" == 32 ]]; then
-  pass "tmux config parses; wheel follows the alternate screen; full session names"
+_wheel=$(tmux -L dev-sh-verify -f "$HOME/.tmux.conf" start-server \; list-keys -T root WheelUpPane \; show -gv status-left-length \; show -gv set-titles-string \; kill-server 2>/dev/null || true)
+if [[ "$_wheel" == *alternate_on* && "$_wheel" == *$'\n32\n'* && "${_wheel##*$'\n'}" == 'dev: #S' ]]; then
+  pass "tmux config parses; wheel follows the alternate screen; full session names; session in window title"
 else
   warn "tmux config did not load cleanly -- tmux source-file ~/.tmux.conf"
 fi
