@@ -1013,6 +1013,38 @@ set -g status-left-length 32
 # to "dev: <session>" on attach and on every session switch.
 set -g set-titles on
 set -g set-titles-string 'dev: #S'
+
+# Drop the editor-specific variables a tmux server inherits from whatever
+# started it. Here that is usually a VS Code integrated terminal, and the
+# server then outlives that window by weeks -- agent sessions run for months
+# -- so every shell it spawns keeps pointing at an editor that is gone. Two of
+# these break things rather than merely going stale:
+#
+#   VSCODE_IPC_HOOK_CLI names a per-window Unix socket used by the `code`
+#   command. The socket dies with the window, so `code <file>` from a pane
+#   talks to a dead socket and fails.
+#
+#   GIT_ASKPASS, with its VSCODE_GIT_ASKPASS_* helpers, points git at VS
+#   Code's askpass dialog. A git operation needing a credential then waits on
+#   an editor that may not be running, hanging instead of prompting in the
+#   terminal. Unset, git falls back to the terminal prompt, which always works.
+#
+# -r rather than -u so `tmux show-environment -g` lists them as "-NAME",
+# recording the removal as deliberate instead of a silent absence. VS Code
+# re-supplies all of these to its own integrated terminal, so nothing is lost
+# there; only the inherited, server-wide copies are dropped.
+set-environment -gr GIT_ASKPASS
+set-environment -gr VSCODE_GIT_ASKPASS_EXTRA_ARGS
+set-environment -gr VSCODE_GIT_ASKPASS_MAIN
+set-environment -gr VSCODE_GIT_ASKPASS_NODE
+set-environment -gr VSCODE_GIT_IPC_HANDLE
+set-environment -gr VSCODE_IPC_HOOK_CLI
+set-environment -gr VSCODE_PYTHON_AUTOACTIVATE_GUARD
+
+# TERM_PROGRAM/_VERSION are left to tmux, which sets them to "tmux" and its
+# own version per pane; the inherited values claimed VS Code 1.136.1.
+set-environment -gr TERM_PROGRAM
+set-environment -gr TERM_PROGRAM_VERSION
 TMUX_CONF_EOF
 if [[ -f "$_tmux_conf" ]] && ! cmp -s "$_tmux_new" "$_tmux_conf"; then
   cp "$_tmux_conf" "$_tmux_conf.pre-dev-sh"
@@ -1086,9 +1118,9 @@ fi
 
 # Captured, not piped to grep -q: under pipefail an early grep exit could
 # fail the pipeline on a good config.
-_wheel=$(tmux -L dev-sh-verify -f "$HOME/.tmux.conf" start-server \; list-keys -T root WheelUpPane \; show -gv status-left-length \; show -gv set-titles-string \; kill-server 2>/dev/null || true)
-if [[ "$_wheel" == *alternate_on* && "$_wheel" == *$'\n32\n'* && "${_wheel##*$'\n'}" == 'dev: #S' ]]; then
-  pass "tmux config parses; wheel follows the alternate screen; full session names; session in window title"
+_wheel=$(tmux -L dev-sh-verify -f "$HOME/.tmux.conf" start-server \; list-keys -T root WheelUpPane \; show-environment -g \; show -gv status-left-length \; show -gv set-titles-string \; kill-server 2>/dev/null || true)
+if [[ "$_wheel" == *alternate_on* && "$_wheel" == *-GIT_ASKPASS* && "$_wheel" == *$'\n32\n'* && "${_wheel##*$'\n'}" == 'dev: #S' ]]; then
+  pass "tmux config parses; wheel follows the alternate screen; full session names; session in window title; inherited editor variables dropped"
 else
   warn "tmux config did not load cleanly -- tmux source-file ~/.tmux.conf"
 fi
