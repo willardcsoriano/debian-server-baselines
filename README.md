@@ -220,7 +220,7 @@ Lynis report: `/var/log/lynis.log`
 
 Every change follows issue → commits → PR → review:
 
-1. **Issue.** Title it in Conventional Commits form, e.g. `fix(dev): swap file refuses on xfs`. The bug, feature and incident forms prefill that shape. `issue-labeler.yml` then labels the issue from its title:
+1. **Issue.** Title it in Conventional Commits form, e.g. `fix(dev): swap file refuses on xfs`. The bug, feature and incident forms (shared from [willardcsoriano/.github](https://github.com/willardcsoriano/.github)) prefill that shape. The shared labeler then labels the issue from its title:
 
    | Title | Labels |
    |---|---|
@@ -234,6 +234,6 @@ Every change follows issue → commits → PR → review:
    Retitling an issue updates its labels. Labels added by hand are never removed.
 2. **Commits.** One per concern on a feature branch, with Conventional Commits subjects.
 3. **PR.** The template opens with `Closes #`, so merging closes the issue.
-4. **Review.** `shellcheck-pr-review.yml` posts shellcheck's findings on every PR as a review. It's a record, not a merge gate.
+4. **Review.** The shared lint review posts shellcheck's findings on every PR as a review. The branch ruleset requires that check (`lint / review`) to have run; its findings are a record.
 
-Issues track work; knowledge that should outlive it goes in `docs/`, which the issue links to. Labeler tests: `bash .github/scripts/label-issue.test.sh`.
+Issues track work; knowledge that should outlive it goes in `docs/`, which the issue links to. The issue forms, PR template, labeler and lint review live in [willardcsoriano/.github](https://github.com/willardcsoriano/.github); this repo's `.github/workflows/` holds only short callers.
